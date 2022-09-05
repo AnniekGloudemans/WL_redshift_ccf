@@ -1,0 +1,9 @@
+# number name wavelength(A) relative_strength
+1 Lya 1215.670  10
+2 CIV-1549 1549.0 0.1
+3 HeII 1640.420 0.1
+4 OII 3726.032 10
+5 Hb 4861.333 1.0
+6 OIII-4959 4958.911 1.0
+7 OIII-5007 5006.843 10
+8 Ha 6562.819 10
