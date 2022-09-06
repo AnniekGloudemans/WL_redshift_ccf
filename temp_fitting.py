@@ -113,11 +113,15 @@ def template_fitting(run_name, data_blue, std_blue, data_red, std_red, data_tabl
 	
 	"""
 
+	try:
+		os.makedirs('../Output_ccf/Catalogs/')
+	except Exception as e: # If folder already exists 
+		pass
+
 	if save_plot_bool == True: # Make directories to save plots
 		try:
-			os.makedirs('Output/Figures/emission_lines_output/emission_lines_'+run_name)
-			os.makedirs('Output/Figures/spectra_output/spectra_'+run_name)
-			os.makedirs('Output/Catalogs/')
+			os.makedirs('../Output_ccf/Figures/emission_lines_output/emission_lines_'+run_name)
+			os.makedirs('../Output_ccf/Figures/spectra_output/spectra_'+run_name)
 
 		except Exception as e: # If folder already exists 
 			pass
@@ -167,7 +171,7 @@ def template_fitting(run_name, data_blue, std_blue, data_red, std_red, data_tabl
 			single_line_bool_all_targets.append(np.nan)
 
 			if save_plot_bool == True:
-				plot.plot_spectrum_blue_red_lines(data_blue[i], data_red[i], data_table_blue['TARGNAME'][i], [np.nan], np.nan, 'Output/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(data_table_blue['TARGNAME'][i])+'_abs.pdf', input_redshift_list[i])
+				plot.plot_spectrum_blue_red_lines(data_blue[i], data_red[i], data_table_blue['TARGNAME'][i], [np.nan], np.nan, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(data_table_blue['TARGNAME'][i])+'_abs.pdf', input_redshift_list[i])
 			continue 
 
 		print('Target', data_table_blue['TARGNAME'][i])
@@ -193,7 +197,7 @@ def template_fitting(run_name, data_blue, std_blue, data_red, std_red, data_tabl
 
 		# If CCF solution found then check if emission lines are real and determine the redshift by calculating the wavelength ratios
 		if len(z_lag_list) > 0:
-			line_wav_list, line_flux_list, line_snr_list = line.finding_emission_lines(data_blue[i], data_red[i], ccf_redshifts_clean, False, False, 'Output/Figures/emission_lines_output/emission_lines_'+run_name+'/emission_line_')
+			line_wav_list, line_flux_list, line_snr_list = line.finding_emission_lines(data_blue[i], data_red[i], ccf_redshifts_clean, False, False, '../Output_ccf/Figures/emission_lines_output/emission_lines_'+run_name+'/emission_line_')
 
 			# Determine the best redshift from the ratios of the real emisson line wavelengths            
 			if len(line_wav_list) > 1:
@@ -224,7 +228,7 @@ def template_fitting(run_name, data_blue, std_blue, data_red, std_red, data_tabl
 			# Check if Ha line in there, if yes, then fit double gaussian and replace line fluxes
 			Ha_line_idx = (ratio_redshift<0.46)*(np.array(line_wav_list)-25 <(1.+ratio_redshift)*6563)*(np.array(line_wav_list)+25 >(1.+ratio_redshift)*6563)
 			if np.sum(Ha_line_idx) > 0:
-				line_wav_Ha, line_flux_Ha, line_snr_Ha = line.fit_Ha_double_gauss(data_red[i], ratio_redshift, 'Output/Figures/emission_lines_output/emission_lines_'+run_name+'/emission_line_Ha.pdf')
+				line_wav_Ha, line_flux_Ha, line_snr_Ha = line.fit_Ha_double_gauss(data_red[i], ratio_redshift, '../Output_ccf/Figures/emission_lines_output/emission_lines_'+run_name+'/emission_line_Ha.pdf')
 				# insert new Ha line wavelength and flux
 				if np.isnan(line_wav_Ha) == True:
 					pass
@@ -263,14 +267,12 @@ def template_fitting(run_name, data_blue, std_blue, data_red, std_red, data_tabl
 
 		# Plot spectrum with identified emission lines
 		if save_plot_bool == True:
-			plot.plot_spectrum_blue_red_lines(data_blue[i], data_red[i], data_table_blue['TARGNAME'][i], line_wav_list, ratio_redshift, 'Output/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(data_table_blue['TARGNAME'][i])+'.pdf', input_redshift_list[i])
+			plot.plot_spectrum_blue_red_lines(data_blue[i], data_red[i], data_table_blue['TARGNAME'][i], line_wav_list, ratio_redshift, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(data_table_blue['TARGNAME'][i])+'.pdf', input_redshift_list[i])
 
 
 	# Write to table
 	try:
-		#write_to_table(data_table_blue, data_table_red, np.array(ratio_redshifts_ccf_list), np.array(line_wavs_all_targets_list), np.array(line_fluxes_all_targets_list), np.array(line_snr_all_targets_list), single_line_bool_all_targets, absorption_spec_bool, 'Output/Catalogs/catalog_'+str(run_name), input_redshift_list)
-
-		write_to_table(data_table_blue, data_table_red, ratio_redshifts_all_targets, line_wavs_all_targets, line_fluxes_all_targets, line_snr_all_targets, single_line_bool_all_targets, absorption_spec_bool, 'Output/Catalogs/catalog_'+str(run_name), input_redshift_list)
+		write_to_table(data_table_blue, data_table_red, ratio_redshifts_all_targets, line_wavs_all_targets, line_fluxes_all_targets, line_snr_all_targets, single_line_bool_all_targets, absorption_spec_bool, '../Output_ccf/Catalogs/catalog_'+str(run_name), input_redshift_list)
 	except Exception as e:
 		print(e)
 		traceback.print_exc()

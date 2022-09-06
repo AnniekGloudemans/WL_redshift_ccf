@@ -41,6 +41,11 @@ global_params.init() # initialize the global parameters
 # File paths
 red_spectra = '/Users/anniekgloudemans/Documents/AA_PhD/Projects/WL_high_z/Data/simulated_data/L1/OB/3130/stacked/stacked_1002813.fit'#/Users/anniekgloudemans/Documents/AA_PhD/Projects/WL_high_z/Data/simulated_data/L1/OB/4376/stacked/stacked_1003809.fit'
 blue_spectra = '/Users/anniekgloudemans/Documents/AA_PhD/Projects/WL_high_z/Data/simulated_data/L1/OB/3130/stacked/stacked_1002814.fit'#'/Users/anniekgloudemans/Documents/AA_PhD/Projects/WL_high_z/Data/simulated_data/L1/OB/4376/stacked/stacked_1003810.fit'
+
+# On herts:
+# red_spectra = '/home/gloudemans/weave_test_data/OB/3130/stacked/stacked_1002813.fit'
+# blue_spectra = '/home/gloudemans/weave_test_data/OB/3130/stacked/stacked_1002814.fit'
+
 run_name = '3130_ccf'#'4367_ccf_normal' Change to OB name 
 
 input_catalog = Table.read("/Users/anniekgloudemans/Documents/AA_PhD/Projects/WL_high_z/Data/simulated_data/input_files/WL_OpR3b_APS_Results_Merged.fits")
@@ -67,7 +72,7 @@ input_redshifts = read_data.input_redshifts_match(table_red[target_bool], input_
 
 # Run CCF
 start = time.time()
-redshifts_template_fitting, emission_line_wavelengths, emission_line_fluxes, emission_line_snrs = temp_fit.template_fitting(run_name, spec_blue[target_bool], spec_std_blue[target_bool], spec_red[target_bool], spec_std_red[target_bool], table_blue[target_bool], table_red[target_bool], input_redshifts, False)
+redshifts_template_fitting, emission_line_wavelengths, emission_line_fluxes, emission_line_snrs = temp_fit.template_fitting(run_name, spec_blue[target_bool], spec_std_blue[target_bool], spec_red[target_bool], spec_std_red[target_bool], table_blue[target_bool], table_red[target_bool], input_redshifts, True)
 end = time.time()
 
 # print('Full run duration ', (end - start)/60., ' min')
@@ -76,11 +81,11 @@ end = time.time()
 # Check performance of ccf if there are input redshifts
 try:
 	if len(input_redshifts) > 0:
-		ratio_redshifts_ccf = Table.read('Output/Catalogs/catalog_'+str(run_name)+'_ccf_results_blue.fits')['z_ccf']
-		single_emission_lines_ccf = Table.read('Output/Catalogs/catalog_'+str(run_name)+'_ccf_results_blue.fits')['single_line_flag']
+		ratio_redshifts_ccf = Table.read('../Output_ccf/Catalogs/catalog_'+str(run_name)+'_ccf_results_blue.fits')['z_ccf']
+		single_emission_lines_ccf = Table.read('../Output_ccf/Catalogs/catalog_'+str(run_name)+'_ccf_results_blue.fits')['single_line_flag']
 		#ratio_redshifts_ccf = np.load("ratio_redshifts_all_targets_4367_ccf_strict.npy")
 
-		plot.ccf_performace(input_redshifts, ratio_redshifts_ccf, 'Output/Figures/ccf_performace_'+run_name+'.pdf', single_emission_lines_ccf)
+		plot.ccf_performace(input_redshifts, ratio_redshifts_ccf, '../Output_ccf/Figures/ccf_performace_'+run_name+'.pdf', single_emission_lines_ccf)
 		diff_z = abs(input_redshifts-ratio_redshifts_ccf)
 		idx_nan = np.isnan(ratio_redshifts_ccf)
 

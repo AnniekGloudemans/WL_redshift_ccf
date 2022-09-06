@@ -360,7 +360,7 @@ def finding_emission_lines(data_blue, data_red, redshift_list, final_run_bool = 
 
                 # Fit gaussian and check if line is real
                 lineflux, SNR, cen_fit, real_bool, spurious_bool = fit_gaussian(global_params.wavelength_b[specmin:specmax], data_blue[specmin:specmax], linewav, line_names_blue[t], plot_bool, savename_plot+line_names_blue[t]+'_'+str(np.int(linewav))+'.pdf')               
-
+                #print('lineflux, SNR, cen_fit, real_bool, spurious_bool', lineflux, SNR, cen_fit, real_bool, spurious_bool)
                 if real_bool == True and spurious_bool == False and np.logical_or(len(line_wav_list) ==0, abs(cen_fit-closest_value(line_wav_list,cen_fit))>10.0): # Save lines if they seem real and not already in the list
                     line_wav_list.append(cen_fit)
                     line_flux_list.append(lineflux)
