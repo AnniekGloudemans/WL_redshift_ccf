@@ -12,6 +12,7 @@ from astropy.table import Table
 from astropy.convolution import convolve, Box1DKernel
 import global_params
 
+np.seterr(divide='ignore', invalid='ignore') # ignore runtime warnings 
 
 # Load the names and wavelength of expected emission lines
 wavelength_table = Table.read('Input/line_wavelengths.txt', format='ascii')
@@ -150,19 +151,19 @@ def rebin(wavs, fluxes, std_dev, arm):
 		den_sum = 0
 
 		for i in calc_log_index: 
-			if fluxes[i]!= 0:
-				num_sum += fluxes[i] * (1 / np.square(std_dev[i]))
-				den_sum += (1 / np.square(std_dev[i]))
+			#if fluxes[i]!= 0:
+			num_sum += fluxes[i] * (1 / np.square(std_dev[i]))
+			den_sum += (1 / np.square(std_dev[i]))
 
 		if log_indx != 0:
-			if fluxes[i]!= 0:
-				num_sum += frac_l * fluxes[calc_log_index[0] - 1] * (1 / np.square(std_dev[calc_log_index[0] - 1]))
-				den_sum += frac_l * (1 / np.square(std_dev[calc_log_index[0] - 1]))
+			#if fluxes[i]!= 0:
+			num_sum += frac_l * fluxes[calc_log_index[0] - 1] * (1 / np.square(std_dev[calc_log_index[0] - 1]))
+			den_sum += frac_l * (1 / np.square(std_dev[calc_log_index[0] - 1]))
 
 		if calc_log_index[-1] < (len(wavs) - 1):
-			if fluxes[i]!= 0:
-				num_sum += frac_r * fluxes[calc_log_index[-1] + 1] * (1 / np.square(std_dev[calc_log_index[-1] + 1]))
-				den_sum += + frac_r * (1 / np.square(std_dev[calc_log_index[-1] + 1]))
+			#if fluxes[i]!= 0:
+			num_sum += frac_r * fluxes[calc_log_index[-1] + 1] * (1 / np.square(std_dev[calc_log_index[-1] + 1]))
+			den_sum += + frac_r * (1 / np.square(std_dev[calc_log_index[-1] + 1]))
 
 		rebin_val[log_indx] = num_sum / den_sum
 		rebin_ivar[log_indx] = den_sum    
