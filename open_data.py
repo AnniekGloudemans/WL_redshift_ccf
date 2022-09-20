@@ -27,6 +27,33 @@ def open_input_data(file_path): # Adjust to WEAVE IO
 	return file, table, spec, spec_std
 
 
+def input_redshifts_match_weaveio(target_table, input_table):
+	"""
+	Find input redshifts 
+
+	Keyword arguments:
+	target_table (table) -- Table with targets from spectral cube
+	input_table (table) -- Table with input parameters of simulated data
+
+	Return:
+	input_redshifts (array) -- List of input redshifts for all targets 
+
+	"""
+	input_redshifts = []
+
+	for i in range(len(target_table)):
+		idx_name = np.where(input_table['TARGNAME'] == target_table['targname'][i])[0] # SHOULD IT NOT BE Z-1??
+		if len(input_table['Z'][idx_name]) > 0:
+			try:
+				input_redshifts.append(input_table['Z'][idx_name][0])
+			except:
+				input_redshifts.append(input_table['Z'][idx_name]) 
+		else:
+			input_redshifts.append(np.nan)
+
+	return np.array(input_redshifts)
+
+
 def input_redshifts_match(target_table, input_table):
 	"""
 	Find input redshifts 

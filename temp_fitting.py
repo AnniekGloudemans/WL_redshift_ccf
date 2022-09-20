@@ -92,7 +92,7 @@ def write_to_table(table_blue, table_red, z_ccfs, line_wavs, line_fluxes, line_s
 
 
 
-def template_fitting(run_name, data_blue, std_blue, data_red, std_red, data_table_blue, data_table_red, input_redshift_list = False, save_plot_bool = False):
+def template_fitting(run_name, data_blue, std_blue, data_red, std_red, data_table_blue, data_table_red, target_names, input_redshift_list = False, save_plot_bool = False):
 	"""
 	Calculate redshifts and identify emission lines in the spectra
 	
@@ -102,6 +102,7 @@ def template_fitting(run_name, data_blue, std_blue, data_red, std_red, data_tabl
 	data_(blue/red) -- blue/red spectra
 	std_(blue/red) -- blue/red spectra standard deviations
 	data_table_(blue/red) (table) -- input data tables
+	target_names (array) -- names of targets 
 	input_redshift_list (boolean) -- default = False
 	save_plot_bool (boolean) -- default = False
 
@@ -171,10 +172,10 @@ def template_fitting(run_name, data_blue, std_blue, data_red, std_red, data_tabl
 			single_line_bool_all_targets.append(np.nan)
 
 			if save_plot_bool == True:
-				plot.plot_spectrum_blue_red_lines(data_blue[i], data_red[i], data_table_blue['TARGNAME'][i], [np.nan], np.nan, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(data_table_blue['TARGNAME'][i])+'_abs.pdf', input_redshift_list[i])
+				plot.plot_spectrum_blue_red_lines(data_blue[i], data_red[i], target_names[i], [np.nan], np.nan, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(target_names[i])+'_abs.pdf', input_redshift_list[i])
 			continue 
 
-		print('Target', data_table_blue['TARGNAME'][i])
+		print('Target', target_names[i])
 		try:
 			print("Input redshift = ", input_redshift_list[i])
 		except:
@@ -251,7 +252,6 @@ def template_fitting(run_name, data_blue, std_blue, data_red, std_red, data_tabl
 			line_snr_all_targets.append(np.array([]))
 			line_wav_list = np.array([])
 
-
 		# Check if any single emission lines in there
 		try:
 			if len(line_wav_list) == 1:
@@ -267,7 +267,7 @@ def template_fitting(run_name, data_blue, std_blue, data_red, std_red, data_tabl
 
 		# Plot spectrum with identified emission lines
 		if save_plot_bool == True:
-			plot.plot_spectrum_blue_red_lines(data_blue[i], data_red[i], data_table_blue['TARGNAME'][i], line_wav_list, ratio_redshift, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(data_table_blue['TARGNAME'][i])+'.pdf', input_redshift_list[i])
+			plot.plot_spectrum_blue_red_lines(data_blue[i], data_red[i], target_names[i], line_wav_list, ratio_redshift, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(target_names[i])+'.pdf', input_redshift_list[i])
 
 
 	# Write to table
