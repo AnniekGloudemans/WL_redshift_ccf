@@ -66,20 +66,20 @@ def match_blue_red_spectra(table_blue, table_red):
 
 	"""
 
-    if len(table_blue) == len(table_red):
-        return table_blue, table_red
-    
-    idx_red_list = []
-    idx_blue_list = []
+	if len(table_blue) == len(table_red):
+		return table_blue, table_red
 
-    for i in range(len(table_blue)):
-        if table_blue['targname'][i] in table_red['targname']:
-            idx_red = np.where(table_red['targname'] == table_blue['targname'][i])[0]
+	idx_red_list = []
+	idx_blue_list = []
 
-            idx_blue_list.append(i)
-            idx_red_list.append(idx_red[0])
+	for i in range(len(table_blue)):
+		if table_blue['targname'][i] in table_red['targname']:
+			idx_red = np.where(table_red['targname'] == table_blue['targname'][i])[0]
 
-    return table_blue[np.array(idx_blue_list)], table_red[np.array(idx_red_list)]
+			idx_blue_list.append(i)
+			idx_red_list.append(idx_red[0])
+
+	return table_blue[np.array(idx_blue_list)], table_red[np.array(idx_red_list)]
 
 
 
