@@ -433,8 +433,8 @@ def line_ratios(line_wavs):
                         wavs_shifted = np.array([line_wavs[h], line_wavs[o]])
                         z_ratio = np.max(wavs_shifted)/np.max(wavs_rest) - 1
 
-                    if z_ratio > 0.0:
-                        z_real_lines.append(z_ratio)
+                        if z_ratio > 0.0:
+                            z_real_lines.append(z_ratio)
 
     # Pick the best redshift corresponding to the found line ratios
     if len(z_real_lines) > 0: 
