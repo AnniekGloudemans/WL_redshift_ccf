@@ -39,12 +39,10 @@ from weaveio import *
 data = Data()
 obs = data.obs
 
-global_params.init() # initialize the global parameters 
-
+global_params.init() # initialize the global parameters
 
 run_name = 'mockdata_stacked_wl'
 
-input_catalog = Table.read('/beegfs/lofar/duncan/WEAVE/OpR3b/MockData/merged_cat_mags_all_OpR3.fits')
 
 # Get WL mock spectra
 
@@ -55,7 +53,7 @@ stacks_red = obs.l1stack_spectra[(obs.l1stack_spectra.targuse == 'T') & (obs.l1s
 table_blue = stacks_blue[['wvl', 'flux', 'ivar', 'sensfunc', 'targid', 'targname', 'targprog']]()
 table_red = stacks_red[['wvl', 'flux', 'ivar', 'sensfunc', 'targid', 'targname', 'targprog']]()
 
-table_blue_sorted, table_red_sorted = match_blue_red_spectra(table_blue, table_red)
+table_blue_sorted, table_red_sorted = read_data.match_blue_red_spectra(table_blue, table_red) # Sort red and blue spectra 
 
 spec_blue = table_blue_sorted['flux']*table_blue_sorted['sensfunc']
 spec_std_blue = table_blue_sorted['ivar']*table_blue_sorted['sensfunc']
@@ -63,33 +61,17 @@ spec_std_blue = table_blue_sorted['ivar']*table_blue_sorted['sensfunc']
 spec_red = table_red_sorted['flux']*table_red_sorted['sensfunc']
 spec_std_red = table_red_sorted['ivar']*table_red_sorted['sensfunc']
 
+
+# Input redshifts? 
+input_catalog = Table.read('/beegfs/lofar/duncan/WEAVE/OpR3b/MockData/merged_cat_mags_all_OpR3.fits') 
 input_redshifts = read_data.input_redshifts_match_weaveio(table_red_sorted, input_catalog)
+
+# Define mask
+mask_blue = np.array([[np.nan, np.nan]])#np.full((len(spec_blue[target_bool]), 2), np.array([[np.nan, np.nan]]))#[4000, 4500])
+mask_red = np.array([[8760, 8792], [6827, 6840], [7521, 7532]]) #np.full((len(spec_red[target_bool]), 2), np.array([[8760, 8780], [6827, 6840]]))
 
 
 # Run CCF
-start = time.time()
-redshifts_template_fitting, emission_line_wavelengths, emission_line_fluxes, emission_line_snrs = temp_fit.template_fitting(run_name, spec_blue, spec_std_blue, spec_red, spec_std_red, table_blue_sorted, table_red_sorted, table_red_sorted['targname'], input_redshifts, True)
-end = time.time()
+temp_fit.template_fitting(spec_blue, spec_std_blue, spec_red, spec_std_red, table_blue_sorted, table_red_sorted, table_red_sorted['targname'], run_name, mask_blue, mask_red, input_redshift_list, True)# mask_blue = False, mask_red = False, input_redshift_list = input_redshifts, write_to_table_bool = True)
 
-print('Full run duration ', (end - start)/60., ' min')
-
-
-# Check performance of ccf if there are input redshifts
-try:
-	if len(input_redshifts) > 0:
-		ratio_redshifts_ccf = Table.read('../Output_ccf/Catalogs/catalog_'+str(run_name)+'_ccf_results_blue.fits')['z_ccf']
-		single_emission_lines_ccf = Table.read('../Output_ccf/Catalogs/catalog_'+str(run_name)+'_ccf_results_blue.fits')['single_line_flag']
-		#ratio_redshifts_ccf = np.load("ratio_redshifts_all_targets_4367_ccf_strict.npy")
-
-		plot.ccf_performace(input_redshifts, ratio_redshifts_ccf, '../Output_ccf/Figures/ccf_performace_'+run_name+'.pdf', single_emission_lines_ccf)
-		diff_z = abs(input_redshifts-ratio_redshifts_ccf)
-		idx_nan = np.isnan(ratio_redshifts_ccf)
-
-		print('Percentage correct redshift in total = ', (np.sum(diff_z<0.1)/len(diff_z))*100, '%')
-		print('Percentage correct redshift no nan = ', (np.sum(diff_z[~idx_nan]<0.1)/len(diff_z[~idx_nan]))*100, '%')
-		print('Number single line targets = ', np.sum(single_emission_lines_ccf == 1))
-
-except Exception as e:
-	print(e)
-	print('No input redshifts available')
 

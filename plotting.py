@@ -29,12 +29,11 @@ def plot_spectrum_blue_red_lines(data_blue, data_red, target_name, line_waveleng
 	Ax1.set_ylim(np.min(data_blue), np.max(data_blue)+1e-17)
 	Ax1.set_xlabel('Wavelength (A)', fontsize=15)
 	Ax1.set_ylabel('erg/cm^2/s/A', fontsize=15)
-	plt.legend()
 
 	for l in range(len(line_wavelengths)):
-		if line_wavelengths[l] < 5772.:
+		if line_wavelengths[l] < 5772.+10.:
 			Ax1.axvline(line_wavelengths[l], color='red', linestyle='--')
-		elif line_wavelengths[l] > 5772. and line_wavelengths[l] < 6088.:
+		elif line_wavelengths[l] > 5772.+10. and line_wavelengths[l] < 6088.-10.:
 			Ax1.axvline(line_wavelengths[l], color='red', linestyle='--')
 			Ax2.axvline(line_wavelengths[l], color='red', linestyle='--')			
 		else:
@@ -44,8 +43,8 @@ def plot_spectrum_blue_red_lines(data_blue, data_red, target_name, line_waveleng
 	Ax2.set_ylim(np.min(data_red), np.max(data_red)+1e-17)
 	Ax2.set_xlabel('Wavelength (A)', fontsize=15)
 	Ax2.set_ylabel('erg/cm^2/s/A', fontsize=15)
-
-	plt.savefig(savename, dpi=100, format='pdf')
+	plt.tight_layout()
+	plt.savefig(savename, dpi=100, format='pdf', bbox_inches='tight')
 	plt.close()
 
 
@@ -92,7 +91,8 @@ def plot_emission_line_fit(fit_wav, fit_flux, gauss_fit, idx_bkg_left_min, idx_b
 	Ax1.text(0.05, 0.5, textstr, transform=Ax1.transAxes, fontsize=14, verticalalignment='bottom', bbox=props)
 	plt.legend()
 	plt.title(str(lineloc_fit), fontsize=20)
-	plt.savefig(savename, dpi=100, format='pdf')
+	plt.tight_layout()
+	plt.savefig(savename, dpi=100, format='pdf', bbox_inches='tight')
 	plt.close()
 
 
@@ -119,5 +119,85 @@ def ccf_performace(true_zs, ccf_zs, savename, single_line_bool = False):
 	plt.xlabel('z_ccf', fontsize=20)
 	plt.ylabel('z_true', fontsize=20)
 	plt.title('Redshift', fontsize=20)
-	plt.savefig(savename, dpi=100, format='pdf')
+	plt.tight_layout()
+	plt.savefig(savename, dpi=100, format='pdf', bbox_inches='tight')
 	plt.close()
+
+
+def plot_continuum_sub(wavs, spectrum, subtracted_spectrum, p, savename):
+
+	Fig, (Ax1) = plt.subplots(1,1, figsize=(8,6))	
+	
+	plt.plot(wavs, spectrum, zorder=1)
+	plt.plot(wavs, subtracted_spectrum)
+	plt.plot(wavs, p(wavs))
+		
+	plt.xlabel('Wavelength', fontsize=20)
+	plt.ylabel('Flux', fontsize=20)
+	plt.title('Continuum subtraction', fontsize=20)
+	plt.tight_layout()
+	plt.savefig(savename, dpi=100, format='pdf', bbox_inches='tight')
+	plt.close()
+
+
+def plot_2D_hist(x, y, z, xlabel, ylabel, savename):
+
+	xticks_array = np.arange(-1+(1/len(x)), 1.0, 2/len(x))#[-0.75,-0.25,0.25,0.75]
+	yticks_array = np.arange(-1+(1/len(y)), 1.0, 2/len(y))
+
+	y = np.flip(np.array(y))
+
+	fig, ax = plt.subplots(1,1)
+	img = ax.imshow(np.array(z), extent=[-1,1, -1,1])#extent=[min(x), max(x), max(y), min(y)])
+	ax.set_xticks(xticks_array)
+	ax.set_xticklabels(x)
+	ax.set_yticks(yticks_array)
+	ax.set_yticklabels(y)
+	ax.set_xlabel(xlabel, fontsize=14)
+	ax.set_ylabel(ylabel, fontsize=14)
+	fig.colorbar(img)
+	plt.savefig(savename, dpi=100, format='pdf', bbox_inches='tight')
+
+
+def plot_fraction_detected_vs_redshift(variable_list, x_data, fraction_matrix, spurious_matrix, xlabel, ylabel, savename):
+
+	fig = plt.figure()
+	ax1 = fig.add_subplot(111)
+	ax2 = ax1.twiny()
+
+	if type(variable_list) == float:
+		ax1.plot(x_data, fraction_matrix, label='Completeness')
+		ax1.plot(x_data, spurious_matrix, color='k', linestyle='--', label='Spurious lines')
+
+	else:
+		for i in range(len(variable_list)):
+			ax1.plot(x_data, fraction_matrix[:,i], label=str(variable_list[i]))
+
+	ax1.set_xlabel(xlabel, fontsize=14)
+	ax1.set_ylabel(ylabel, fontsize=14)
+
+	z_ticks = np.arange(min(x_data), max(x_data), 1.0)
+	wav_ticks = (1+z_ticks)*1216.
+
+	ax2.set_xlim(ax1.get_xlim())
+	ax2.set_xticks(z_ticks)
+	ax2.set_xticklabels(wav_ticks)
+	ax2.set_xlabel("Wavelength", fontsize=14)
+
+	ax1.legend()
+	plt.savefig(savename, dpi=100, format='pdf', bbox_inches='tight')
+
+
+def plot_detected_curves(std_list, lum_list, fraction_matrix, savename):
+
+	fig, ax = plt.subplots(1,1)
+
+	for i in range(len(std_list)):
+		ax.plot(lum_list, fraction_matrix[:,i], label=str(std_list[i]))
+
+	ax.set_xlabel('Luminosity')
+	ax.set_ylabel('Fraction detected')
+	plt.legend()
+	plt.savefig(savename, dpi=100, format='pdf', bbox_inches='tight')
+
+

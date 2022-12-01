@@ -22,6 +22,10 @@ def init():
 	global template_std_r
 	global wav_r_min
 	global wav_b_min
+	global wav_r_max
+	global wav_b_max
+	global bin_counts_blue
+	global bin_counts_red
 
 	cosmo = FlatLambdaCDM(H0=70 * u.km / u.s / u.Mpc, Tcmb0=2.725 * u.K, Om0=0.3)
 
@@ -32,10 +36,15 @@ def init():
 
 	wav_steps = 0.25
 	wav_b_min = 3676.0
+	wav_b_max = 6088.25
 	wav_r_min = 5772.0
+	wav_r_max = 9594.25
 
-	pix_r = (np.log(9594.25) - np.log(5772))/1526
-	pix_b = (np.log(6088.25) - np.log(3676))/1515
+	bin_counts_blue = 1515
+	bin_counts_red = 1526
+
+	pix_r = (np.log(9594.25) - np.log(5772))/1526 # ~ 0.000333
+	pix_b = (np.log(6088.25) - np.log(3676))/1515 # ~ 0.000333
 	pix_set1 = 2.144698713e-4 
 	pix_set2 = 2.648662384e-4
 
