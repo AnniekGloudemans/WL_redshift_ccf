@@ -4,7 +4,6 @@ from astropy.io import fits
 import warnings
 import matplotlib.pyplot as plt
 import time
-import pdb
 from scipy.stats import kurtosis, skew
 import traceback
 from astropy import units as u
@@ -37,6 +36,7 @@ def bimodal(x,mu1,sigma1,A1,mu2,sigma2,A2, y0):
 
 
 def spectrum_range(spectrum, center, width):
+    """Return index of wavelength range"""
     specmax = min(enumerate(spectrum), key=lambda x: abs(x[1]-(center + width)))[0] 
     specmin = min(enumerate(spectrum), key=lambda x: abs(x[1]-(center - width)))[0]
     return specmin, specmax
@@ -89,13 +89,18 @@ def fit_gaussian(fit_wav, fit_flux, fit_flux_err, lineloc, linename, plot_bool =
     try:
         popt, pcov = curve_fit(gauss, fit_wav, fit_flux, p0=[np.max(fit_flux), lineloc, 5.0, 0.0])
         amp_fit, cen_fit, width_fit, offset_fit = popt
+        
+        fwhm_fit = 2.355*width_fit # in Angstrom - only for gaussian line
+        fhwm_fit_km_s = 2.355*width_fit*global_params.c / cen_fit 
 
         fitspec_step = (max(fit_wav)-min(fit_wav))/len(fit_wav)
         lineflux = np.sum(fitspec_step * gauss(fit_wav,*popt))-np.sum(offset_fit*(max(fit_wav)-min(fit_wav))) # Take area underneat curve to determine line flux
 
         # Get region around emission line to determine the scatter
-        lowerspecmin, upperspecmax = spectrum_range(fit_wav, cen_fit, 6*abs(width_fit))
-        lowerspecmax, upperspecmin = spectrum_range(fit_wav, cen_fit, 3*abs(width_fit))
+        lowerspecmin = find_nearest(fit_wav, cen_fit-6*abs(width_fit))
+        lowerspecmax = find_nearest(fit_wav, cen_fit-3*abs(width_fit))
+        upperspecmin = find_nearest(fit_wav, cen_fit+3*abs(width_fit))
+        upperspecmax = find_nearest(fit_wav, cen_fit+6*abs(width_fit))
 
         # Determine the noise of background
         if len(np.where(fit_flux[lowerspecmin:lowerspecmax] == 0.0)[0]) > len(fit_flux[lowerspecmin:lowerspecmax])/2.: # get only std of red side
@@ -115,12 +120,12 @@ def fit_gaussian(fit_wav, fit_flux, fit_flux_err, lineloc, linename, plot_bool =
         if std_cont == 0.0 and width_fit < 1: # happens when no data points in std cont region, because width of fit so small 
             return lineflux, np.nan, cen_fit, False, False
         else:
-        	#SNR = np.max(gauss(fit_wav,*popt)-offset_fit) / std_cont 
-            flux_fwhm = gauss(fit_wav,*popt)[specmin_SNR:specmax_SNR]-offset_fit 
-            SNR = np.sqrt(sum(i**2 for i in flux_fwhm)) / std_cont # Maybe calculate SNR differently?
+        	# SNR = np.max(gauss(fit_wav,*popt)-offset_fit) / std_cont 
+            flux_1sigma_region = gauss(fit_wav,*popt)[specmin_SNR:specmax_SNR]-offset_fit 
+            SNR = np.sqrt(sum(i**2 for i in flux_1sigma_region)) / std_cont # Maybe calculate SNR differently?
 
         # Calculate chi squared of fit to pick out spurious lines
-        chisq = np.sum((fit_flux[specmin_SNR:specmax_SNR] - gauss(fit_wav,*popt)[specmin_SNR:specmax_SNR]) **2/fit_flux_err[specmin_SNR:specmax_SNR]**2)
+        # chisq = np.sum((fit_flux[specmin_SNR:specmax_SNR] - gauss(fit_wav,*popt)[specmin_SNR:specmax_SNR]) **2/fit_flux_err[specmin_SNR:specmax_SNR]**2)
 
         # Check reasonable parameters for gaussian fit
         if np.logical_or(SNR > 5.0, (SNR>4.0) * (final_run_bool == True) * (linename=='OIII-4959')) and np.isinf(SNR) == False and width_fit < 100. and np.logical_or(width_fit > 1.5, (width_fit > 1.0) * (linename == 'OIII-4959')) and amp_fit > 0.0 and lineflux > 0.0 and np.logical_or(np.logical_or(abs(cen_fit-lineloc)<35.*(width_fit>20.0), abs(cen_fit-lineloc)<45.*(width_fit>50.0)), abs(cen_fit-lineloc)<30.): 
@@ -133,7 +138,7 @@ def fit_gaussian(fit_wav, fit_flux, fit_flux_err, lineloc, linename, plot_bool =
 
             spurious_bool = False
 
-            if cen_fit < min(global_params.wavelength_b)+100 or cen_fit > max(global_params.wavelength_r)-100: # Not on edge of blue or red spectrum
+            if (cen_fit < min(global_params.wavelength_b)+100 or cen_fit > max(global_params.wavelength_r)-100) and SNR < 20.: # Not on edge of blue or red spectrum
                 spurious_bool = True
             elif np.logical_or(abs(cen_fit-5510) < 60, abs(cen_fit-7630) < 90): # Not in one of the gaps 
                 spurious_bool = True
@@ -141,26 +146,24 @@ def fit_gaussian(fit_wav, fit_flux, fit_flux_err, lineloc, linename, plot_bool =
                 spurious_bool = True
             elif width_fit > 20.0 and SNR < 7.0: # Do not allow any low SNR lines with large widths
                 spurious_bool = True
+            elif width_fit < 4.0 and SNR < 6.0 and final_run_bool == False: # Do not allow any low SNR lines with small widths if not final line search
+                spurious_bool = True
             # elif SNR < 10. and chisq < 0.01 and final_run_bool == False:# Likely spurious/sky line 
             #     spurious_bool = True
 
         else:
-            spurious_bool = np.nan
+            spurious_bool = np.nan 
         
         if plot_bool == True and real_bool == True and spurious_bool == False:
-            #print('line, wav, final_bool chisq', linename, lineloc, final_run_bool, chisq)
             plot.plot_emission_line_fit(fit_wav, fit_flux, gauss(fit_wav,*popt), lowerspecmin, lowerspecmax, upperspecmin, upperspecmax, popt, pcov, lineloc, lineflux, SNR, spurious_bool, real_bool, savename_plot)
 
         return lineflux, SNR, cen_fit, real_bool, spurious_bool
     
     except Exception as e:
-        print(e)
-
         return np.nan, np.nan, np.nan, False, np.nan
 
 
-
-def fit_double_gauss(linewav, wavs, flux, ratio_redshift, savename_plot, plot_bool = False):
+def fit_double_gauss(linewav, wavs, flux, ratio_redshift, plot_bool = False, savename_plot = False):
     """
     Fitting double gaussian for to emission lines
 
@@ -188,7 +191,11 @@ def fit_double_gauss(linewav, wavs, flux, ratio_redshift, savename_plot, plot_bo
         popt, pcov = curve_fit(bimodal,wavs[specmin:specmax],flux[specmin:specmax],p0=[popt_one[1]-(popt_one[2]/2), 5.0, np.max(flux[specmin:specmax]), popt_one[1]+(popt_one[2]/1.5), 5.0, np.max(flux[specmin:specmax]), 0.0])
 
         lineflux = np.sum(fitspec_step * bimodal(wavs[specmin:specmax],*popt))-np.sum(popt[6]*(max(wavs[specmin:specmax])-min(wavs[specmin:specmax])))
-        linewav = popt[0] # Take first gaussian peak, could also take average: (popt[0]+popt[3])/2 
+        
+        if popt[0] < linewav - 200:
+            return np.nan, np.nan, np.nan
+        else:
+            linewav = popt[0] # Take first gaussian peak, could also take average: (popt[0]+popt[3])/2 
 
         # Determine SNR
         lowerspecmin, upperspecmax =spectrum_range(wavs[specmin:specmax], linewav, 6*abs(popt[1]+popt[4]))
@@ -200,14 +207,18 @@ def fit_double_gauss(linewav, wavs, flux, ratio_redshift, savename_plot, plot_bo
         specmin_SNR = min(enumerate(wavs[specmin:specmax]), key=lambda x: abs(x[1]-(popt[0] - 0.5*popt[1])))[0] 
         specmax_SNR = min(enumerate(wavs[specmin:specmax]), key=lambda x: abs(x[1]-(popt[3] + 0.5*popt[4])))[0] 
 
-        flux_fwhm = bimodal(wavs[specmin:specmax],*popt)[specmin_SNR:specmax_SNR]-popt[6] 
-        SNR = np.sqrt(sum(i**2 for i in flux_fwhm)) / std_cont
+        flux_1sigma_region = bimodal(wavs[specmin:specmax],*popt)[specmin_SNR:specmax_SNR]-popt[6] 
+        SNR = np.sqrt(sum(i**2 for i in flux_1sigma_region)) / std_cont
 
         if plot_bool == True:
             plot.plot_emission_line_fit(wavs[specmin:specmax], flux[specmin:specmax], bimodal(wavs[specmin:specmax],*popt), lowerspecmin, lowerspecmax, upperspecmin, upperspecmax, popt, pcov, linewav, lineflux, SNR, np.nan, np.nan, savename_plot)
 
-        return linewav, lineflux, SNR
-    except:
+        if SNR < 5. or np.isnan(SNR) == True: # If something went wrong in fitting
+            return np.nan, np.nan, np.nan
+        else:
+            return linewav, lineflux, SNR
+
+    except Exception as e:
         return np.nan, np.nan, np.nan
 
 
@@ -216,12 +227,14 @@ def single_emission_line(data_blue, data_red, linewav): # WORK IN PROGRESS
     If only one emission line check if its likely OIII, OII or Lya
 
     Keyword arguments:
+    data_blue/red -- blue and red spectrum
+    linewav (float) -- wavelength of single emission line
 
     Return:
 
     """
 
-    # Try fitting double gaussian --> how determine if this is better? 
+    # Try fitting double gaussian + determine skewness 
 
     # Check skewness of single gaussian fit 
     specmin = min(enumerate(global_params.wavelength_r), key=lambda x: abs(x[1]-(linewav-100)))[0]
@@ -303,7 +316,7 @@ def finding_emission_lines(data_blue, data_blue_err, data_red, data_red_err, red
                 elif line_names_red[t] == 'NeIII-3868' and final_run_bool == True:
                     fit_line_region = 50.0
                 else:
-                    fit_line_region = 100.
+                    fit_line_region = 100. # was 100.
 
                 specmin = min(enumerate(global_params.wavelength_r), key=lambda x: abs(x[1]-(linewav-fit_line_region)))[0]
                 specmax = min(enumerate(global_params.wavelength_r), key=lambda x: abs(x[1]-(linewav+fit_line_region)))[0]
@@ -375,7 +388,7 @@ def line_ratios(line_wavs):
         res = max(set(z_real_lines_pick), key = z_real_lines_pick.count)
 
         arg_res = np.where(z_real_lines_pick == res)[0]
-        ratio_redshift = np.mean(np.array(z_real_lines)[arg_res]) # final redshift is average of all the best solutions 
+        ratio_redshift = np.mean(np.array(z_real_lines)[arg_res]) # Final redshift is average of all the best solutions 
 
         diff_res = np.array(z_real_lines_sum_list) - np.max(z_real_lines_sum_list)
         idx_alternative = np.where(abs(diff_res) < 5)[0]
@@ -389,7 +402,7 @@ def line_ratios(line_wavs):
               ratio_redshift = z_real_lines[arg_res]
 
     else:
-        ratio_redshift = np.nan # single line
+        ratio_redshift = np.nan # if single line
 
     return ratio_redshift
 

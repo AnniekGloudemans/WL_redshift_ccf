@@ -4,7 +4,6 @@ from astropy.io import fits
 import warnings
 import matplotlib.pyplot as plt
 import time
-import pdb
 import plotting as plot
 from scipy.stats import kurtosis, skew
 import traceback
@@ -14,6 +13,9 @@ from astropy.convolution import convolve, Box1DKernel
 from astropy.cosmology import WMAP9 as cosmo
 import global_params
 import spectres as spec
+from astropy.nddata import StdDevUncertainty
+from specutils import Spectrum1D
+from specutils.fitting import fit_generic_continuum
 
 np.seterr(divide='ignore', invalid='ignore') # ignore runtime warnings 
 
@@ -44,22 +46,11 @@ def prepare_template(key='AGN'):
             0, 0, 0, 364, 0, 0, 0, 0, 0, 0, 0, 0, 
             100, 307, 866, 0, 310, 0]
 
-        # AGNstr = [0, 0., 0, 300, 0, 0, 0, 50, 0, 0,0, 0,  0,  
-        #             0, 0, 0, 364, 0, 0, 0, 0, 0, 0, 0, 0, 
-        #             100, 307, 866, 0, 310, 0]
-
         AGNLineNames = ['NeVIII', 'Lyb', 'OVI', 'Lya', 'NV', 'CII', 'SiIV', 'CIV', 'HeII', 'OIII-1663', 'CIII', 'CII-2325', 'MgII',
                         'HeII-3203', 'NeV-3346', 'NeV-3426', 'OII', 'HeI', 'Hepsilon', 'NeIII', 'FeV', 'Hdelta', 'Hgamma', 'OIII-4363', 'HeII-4686',
                         'Hb', 'OIII-4959', 'OIII-5007', 'NII-6548', 'Ha', 'NII-6583']
 
-        # # ankur --> no OII line?             
-        # AGNLines = [770, 1023, 1035, 1216, 1240, 1336, 1402, 1549, 1640, 1663, 1909, 2326, 2424, 2426, 2470, 2798, 3113,
-        #             3203, 3346, 3426, 2727, 2869, 3889, 3970, 3967, 4072, 4102, 4340, 4363, 4686, 4861, 4959, 5007,
-        #             6563, 6583]
-        # AGNstr = [0, 0, 0, 3100, 154, 37, 163, 364, 318, 72, 177, 92, 41, 49, 41, 78, 11, 14, 20,
-        #           69, 364, 82, 19, 21, 26, 16, 22, 24, 8, 20, 100, 307, 866, 310, 0]
-
-        galaxyStr_Norm = AGNstr / np.max(AGNstr) * 1e-17 * 10 # 1e-17*2 adjust height to match spectrum
+        galaxyStr_Norm = AGNstr / np.max(AGNstr) * 1e-17 * 10 # adjust height of template to match spectrum
         global_params.gal_zipper = zip(AGNLines, galaxyStr_Norm)
         global_params.gal_ziptmp = list(global_params.gal_zipper)
         global_params.gal_zip = sorted(global_params.gal_ziptmp, key=lambda x: x[1], reverse=True)
@@ -136,71 +127,6 @@ def shift_template(template_flux, wavs,  z, colour):
 		return ySum
 
 
-def rebin(wavs, fluxes, std_dev, arm): 
-	
-	"""
-	Shift the template with redshift 
-
-	Keyword arguments:
-	wavs (array) -- wavelengths of spectrum
-	template_flux (array) -- fluxes of spectrum
-	std_dev (array) -- 
-	arm (str) -- 'blue' or 'red'
-
-	Return:
-	log_wvlngth (array) -- wavelengths in log space
-	rebin_val (array) -- rebinned flux values
-	rebin_ivar (array) -- rebinned std values
-
-	"""
-
-	if arm == 'blue':
-		range_begin = global_params.wav_b_min
-		range_end = global_params.wav_b_max
-		bin_counts = global_params.bin_counts_blue
-
-	elif arm == 'red':
-		range_begin = global_params.wav_r_min
-		range_end = global_params.wav_r_max
-		bin_counts = global_params.bin_counts_red
-
-	log_wvlngth = np.logspace(np.log(range_begin), np.log(range_end), bin_counts, base=np.e) 
-	rebin_val = np.zeros(bin_counts) # create empty arrays for new flux values
-	rebin_ivar = np.zeros(bin_counts)
-
-	for log_indx in range(0, bin_counts-1):	
-		calc_log = np.where(np.logical_and((wavs >= log_wvlngth[log_indx]),
-		                                  (wavs < log_wvlngth[log_indx + 1])))
-		calc_log_index = (np.asarray(calc_log)).flatten()
-		frac_r = (log_wvlngth[log_indx + 1] - wavs[calc_log_index[-1]]) / global_params.wav_steps # divide by 0.25 because original wavelength has resolution of 0.25
-		frac_l = (wavs[calc_log_index[0]] - log_wvlngth[log_indx]) / global_params.wav_steps		
-
-		num_sum = 0
-		den_sum = 0
-
-		for i in calc_log_index: 
-			#if fluxes[i]!= 0:
-			num_sum += fluxes[i] * (1 / np.square(std_dev[i]))
-			den_sum += (1 / np.square(std_dev[i]))
-
-		if log_indx != 0:
-			#if fluxes[i]!= 0:
-			num_sum += frac_l * fluxes[calc_log_index[0] - 1] * (1 / np.square(std_dev[calc_log_index[0] - 1]))
-			den_sum += frac_l * (1 / np.square(std_dev[calc_log_index[0] - 1]))
-
-		if calc_log_index[-1] < (len(wavs) - 1):
-			#if fluxes[i]!= 0:
-			num_sum += frac_r * fluxes[calc_log_index[-1] + 1] * (1 / np.square(std_dev[calc_log_index[-1] + 1]))
-			den_sum += + frac_r * (1 / np.square(std_dev[calc_log_index[-1] + 1]))
-
-		rebin_val[log_indx] = num_sum / den_sum
-		rebin_ivar[log_indx] = den_sum
-
-	#rebin_val, rebin_ivar = spec.spectres(log_wvlngth, wavs, fluxes, std_dev, verbose=False) # Faster! 
-
-	return log_wvlngth, rebin_val, rebin_ivar
-
-
 
 def find_lines(z, arm):
 	"""
@@ -237,7 +163,9 @@ def find_lines(z, arm):
 	return np.array(line_wavs), np.array(line_names)
 
 
-def absorption_spectra_check(data_blue, data_red):
+
+
+def absorption_spectra_check(spectra_blue, spectra_red):
 	"""
 	Check if any of the spectra are is potentially an absorpion line spectrum 
 	by fitting a 6th order polynomial
@@ -251,7 +179,7 @@ def absorption_spectra_check(data_blue, data_red):
 	"""
 	bool_array = []
 
-	for i in range(len(data_blue)):
+	for i in range(len(spectra_blue)):
 
 		# Indices to fit only part of the spectrum 
 		blue_min = 2000 
@@ -260,30 +188,30 @@ def absorption_spectra_check(data_blue, data_red):
 		red_max = 14000
 
 		# fit 6th order polynomial and subtract continuum from the data  
-		z_blue = np.polyfit(global_params.wavelength_b, data_blue[i], 6)
+		z_blue = np.polyfit(global_params.wavelength_b, spectra_blue[i].flux.value, 6)
 		p_blue = np.poly1d(z_blue)
 
-		z_red = np.polyfit(global_params.wavelength_r, data_red[i], 6)
+		z_red = np.polyfit(global_params.wavelength_r, spectra_red[i].flux.value, 6)
 		p_red = np.poly1d(z_red)
 
-		std_red_abs = np.std(data_red[i][red_min:red_max]-p_red(global_params.wavelength_r[red_min:red_max]))
-		std_blue_abs = np.std(data_blue[i][blue_min:blue_max]-p_blue(global_params.wavelength_b[blue_min:blue_max]))
+		std_red_abs = np.std(spectra_red[i].flux.value[red_min:red_max]-p_red(global_params.wavelength_r[red_min:red_max]))
+		std_blue_abs = np.std(spectra_blue[i].flux.value[blue_min:blue_max]-p_blue(global_params.wavelength_b[blue_min:blue_max]))
 
 		# Check how many measurements are below or above 2 sigma + the average and determine if spectrum is likely absorption spectrum 
-		idx_red_down = np.where(((data_red[i][red_min:red_max]-p_red(global_params.wavelength_r[red_min:red_max])) < -2*std_red_abs) & (data_red[i][red_min:red_max] != 0.0))[0]
-		idx_blue_down = np.where((data_blue[i][blue_min:blue_max]-p_blue(global_params.wavelength_b[blue_min:blue_max]) < -2*std_blue_abs)& (data_blue[i][blue_min:blue_max] != 0.0) )[0]
+		idx_red_down = np.where(((spectra_red[i].flux.value[red_min:red_max]-p_red(global_params.wavelength_r[red_min:red_max])) < -2*std_red_abs) & (spectra_red[i].flux.value[red_min:red_max] != 0.0))[0]
+		idx_blue_down = np.where((spectra_blue[i].flux.value[blue_min:blue_max]-p_blue(global_params.wavelength_b[blue_min:blue_max]) < -2*std_blue_abs)& (spectra_blue[i].flux.value[blue_min:blue_max] != 0.0) )[0]
 		red_down_count = len(idx_red_down)
 		blue_down_count = len(idx_blue_down)
 
-		red_up_count = len(np.where(((data_red[i][red_min:red_max]-p_red(global_params.wavelength_r[red_min:red_max])) > 2*std_red_abs) & (data_red[i][red_min:red_max] != 0.0))[0])
-		blue_up_count = len(np.where((data_blue[i][blue_min:blue_max]-p_blue(global_params.wavelength_b[blue_min:blue_max]) > 2*std_blue_abs)& (data_blue[i][blue_min:blue_max] != 0.0) )[0])
+		red_up_count = len(np.where(((spectra_red[i].flux.value[red_min:red_max]-p_red(global_params.wavelength_r[red_min:red_max])) > 2*std_red_abs) & (spectra_red[i].flux.value[red_min:red_max] != 0.0))[0])
+		blue_up_count = len(np.where((spectra_blue[i].flux.value[blue_min:blue_max]-p_blue(global_params.wavelength_b[blue_min:blue_max]) > 2*std_blue_abs)& (spectra_blue[i].flux.value[blue_min:blue_max] != 0.0) )[0])
 
 		clustering_blue = np.std(global_params.wavelength_b[idx_blue_down])
 		clustering_red = np.std(global_params.wavelength_r[idx_red_down])
 
 		if red_down_count-red_up_count > 100 or blue_down_count-blue_up_count > 100 or (red_down_count-red_up_count)+(blue_down_count-blue_up_count) > 70 or (blue_down_count-blue_up_count > 25 and clustering_blue < 300) or (red_down_count-red_up_count > 25 and clustering_red < 300):
             
-			if np.median(data_red[i]) > 0.1e-16 or np.median(data_blue[i]) > 0.1e-16: # check if this works on real data
+			if np.median(spectra_red[i].flux.value) > 0.1e-16 or np.median(spectra_blue[i].flux.value) > 0.1e-16: # check if this works on real data
 				bool_array.append(True)
 			else:
 				bool_array.append(False)
@@ -293,14 +221,19 @@ def absorption_spectra_check(data_blue, data_red):
 	return bool_array
 
 
-def preprocess_spectra(spectrum, colour = False, plot_bool = False, savename = False):#, masking_region = np.nan):
+def preprocess_spectra(spectrum, colour = False, plot_bool = False, savename = False):
 	"""
 	Preprocess the spectra by taking out masked regions 
 
 	Keyword arguments:
-	data_(blue/red) -- blue or red spectrum
+	spectrum -- blue or red spectrum
+	colour -- blue or red
+	plot_bool (boolean) -- default False
+	savename (str) -- name save plot
 
 	Return:
+	subtracted_spec -- spectrum with polynomial subtracted
+
 	"""
 
 	if colour == 'blue':
@@ -323,56 +256,96 @@ def preprocess_spectra(spectrum, colour = False, plot_bool = False, savename = F
 	return subtracted_spec
 
 
-def masking_spectra(spectrum, std_spectrum, masks, colour): 
+def masking_spectra(spectrum, masks): 
 	"""
 	Mask parts of spectrum contaminated with skylines 
+
+	Keyword arguments:
+	spectrum -- blue or red spectrum
+	masks (array) -- wavelength values to mask
+
+	Return:
+	spectrum_masked_list (array) -- new spectrum with flux values masked
+
+	"""
+
+	spectrum_masked_list = []
+
+	for i, spec in enumerate(spectrum): # Loop over all spectra
+
+		for j in range(len(masks)): # Loop over masked array
+			idx_mask = np.where((spec.spectral_axis.value > masks[j][0]) & (spec.spectral_axis.value < masks[j][1])) # convert wavelength to index
+			spec.flux[idx_mask] = 0.0
+
+		spectrum_masked_list.append(spec)
+
+	return np.array(spectrum_masked_list)
+
+
+def find_chipgaps(spectrum, masks, colour):
+	"""
+	Finding wavelength of the chipgap in spectrum 
+
+	Keyword arguments:
+	spectrum -- blue or red spectrum
+	masks -- array with masked wavelength values
+	colour (str) -- 'r' or 'b' for red or blue
+
+	Return:
+	gap (array) -- min and max wavelength values of the chipgap region
+
+	"""
+
+	mask_bool_array = np.full(len(spectrum.spectral_axis.value), True)
+	
+	try:
+		for j in range(len(masks)): # Loop over masked array
+				idx_mask = np.where((spectrum.spectral_axis.value > masks[j][0]) & (spectrum.spectral_axis.value < masks[j][1])) # convert wavelength to index
+				mask_bool_array[idx_mask] = False
+	except: # if no masks 
+		pass
+
+	if colour == 'b':
+		gap_bool = (spectrum.flux.value == 0.0) * (global_params.wavelength_b > 4000.) * (global_params.wavelength_b < 6000.) * mask_bool_array
+		wav_gap = global_params.wavelength_b[gap_bool]
+	elif colour == 'r':
+		gap_bool = (spectrum.flux.value == 0.0) * (global_params.wavelength_r > 6000.) * (global_params.wavelength_r < 9500.) * mask_bool_array
+		wav_gap = global_params.wavelength_r[gap_bool]
+	
+	gap = np.array([min(wav_gap), max(wav_gap)])
+
+	return gap
+
+
+def inject_gaussian(spectra_array, Lya_line_template):
+	"""
+	Inject 1D gaussian into Spectrum1D object 
 
 	Keyword arguments:
 
 	Return:
 
 	"""
-	spectrum_masked_list = []
-	spectrum_std_masked_list = []
 
-	if colour == 'blue':
-		#idx_wavelenghts = global_params.xaxis_b
-		wavelengths = global_params.wavelength_b
+	uncertainty = StdDevUncertainty(0.001*1e-17*np.ones(len(spectra_array[0].spectral_axis))*u.Unit('erg cm-2 s-1 AA-1')) # change!! 
 
-	elif colour == 'red':
-		#idx_wavelenghts = global_params.xaxis_r
-		wavelengths = global_params.wavelength_r
+	spectra_array_injected = []
 
-	for i, spec in enumerate(spectrum):
+	for i in range(len(spectra_array)):
+	    flux = spectra_array[i].flux + np.array(Lya_line_template) * u.Unit('erg cm-2 s-1 AA-1')
+	    spec = Spectrum1D(spectral_axis=spectra_array[i].spectral_axis, flux=flux, uncertainty=uncertainty)#std_spec) SOMETHING WRONG WITH STD_SPEC
+	    spectra_array_injected.append(spec)
 
-		spec_array = spec
-		spec_std_array = std_spectrum[i]
-
-		for j in range(len(masks)): # Loop over masked array
-
-			# Determine the indices corresponding to the wavelengths
-			#idx_mask = np.where((wavelengths > masks[i][j][0]) & (wavelengths < masks[i][j][1]))
-			idx_mask = np.where((wavelengths > masks[j][0]) & (wavelengths < masks[j][1])) # convert wavelength to index
-			
-			# Set masked data to zero
-			spec_array[idx_mask] = 0.0 #[masks_wav[i][0]:masks_wav[i][1]] = 0.0 #np.nan
-			
-			spec_std_array[idx_mask] = 0.0 #[masks_wav[i][0]:masks_wav[i][1]] = 0.0#np.nan
-
-		spectrum_masked_list.append(spec_array)
-		spectrum_std_masked_list.append(spec_std_array)
-
-	return np.array(spectrum_masked_list), np.array(spectrum_std_masked_list)
+	return spectra_array_injected
 
 
-
-def line_inject(luminosity, std_insert, data_blue, std_blue, data_red, std_red, z, line_wav_insert, linestyle, fix_line_flux = False, average_z = False):#, sky_line_bool, data_table, blue_table_full, red_table_full, blue_savename, red_savename):
+def line_inject(luminosity, std_insert, spectra_blue, spectra_red, z, line_wav_insert, linestyle, fix_line_flux = False, average_z = False):#, sky_line_bool, data_table, blue_table_full, red_table_full, blue_savename, red_savename):
     """
     Inject a single or double gaussian in a spectrum
 
 	Keyword arguments:
-	luminosity (float)  -- 
-	std_insert (float)  -- 
+	luminosity (float)  -- luminosity in erg/s
+	std_insert (float)  -- std of gaussian in Angstrom
 	data_(blue/red) -- blue/red spectra
 	std_(blue/red) -- blue/red spectra standard deviations 
 	z (float) -- redshift of emission line to be injected
@@ -387,14 +360,15 @@ def line_inject(luminosity, std_insert, data_blue, std_blue, data_red, std_red, 
     """
 
     # Saxena radio galaxy: z=5.7, line flux 1.6e-17, fwhm 370 km/s, lum 5.7e42 erg/s
+
+    #---------------------------------------- Prepare general line features -----------------------------------#
+
     if fix_line_flux == True:
         dl = cosmo.luminosity_distance(average_z)
-        L = 10**luminosity
-        lineflux_insert = (L / (4*np.pi*(dl*(3.08567758*10**24))**2)).value
+        lineflux_insert = (luminosity / (4*np.pi*(dl*(3.08567758*10**24))**2)).value
     else:
         dl = cosmo.luminosity_distance(z)
-        L = 10**luminosity
-        lineflux_insert = (L / (4*np.pi*(dl*(3.08567758*10**24))**2)).value
+        lineflux_insert = (luminosity / (4*np.pi*(dl*(3.08567758*10**24))**2)).value
 
     shifted_b = index_data(line_wav_insert * (z + 1), 'b')
     shifted_r = index_data(line_wav_insert * (z + 1), 'r')
@@ -403,17 +377,18 @@ def line_inject(luminosity, std_insert, data_blue, std_blue, data_red, std_red, 
 
     fit_step = ((max(global_params.xaxis_b)-min(global_params.xaxis_b))/len(global_params.xaxis_b))/(1./global_params.wav_steps)
 
+    #---------------------------------------- Preparing single emission line -----------------------------------#
+
     if linestyle =='single':
         height_blue = lineflux_insert/np.sum(makeGaus_no_ht(shifted_b, global_params.xaxis_b, std=std_insert)*fit_step)
         height_red = lineflux_insert/np.sum(makeGaus_no_ht(shifted_r, global_params.xaxis_r, std=std_insert)*fit_step)
 
+        # Could also use models.Gaussian1D(amplitude=3.*u.Jy, mean=61000*u.AA, stddev=10000.*u.AA) from specutils
         Lya_line_template_blue = makeGaus(shifted_b, global_params.xaxis_b, height_blue, std=std_insert) # height and line flux linear relation! used Aayush's source to calibrate, but need to change 2.57e-18 again if change the std
         Lya_line_template_red = makeGaus(shifted_r, global_params.xaxis_r, height_red, std=std_insert)    
 
-        print('height_blue', height_blue)
-        print('height_red', height_red)
-        print('lineflux_insert', lineflux_insert)
-        print('std_insert', std_insert)
+
+    #---------------------------------------- Preparing double emission line -----------------------------------#
 
     elif linestyle == 'double': # OII --> 3726.032 & 3728.815
         shifted_b_1 = index_data((line_wav_insert-2) * (z + 1), 'b')
@@ -424,26 +399,23 @@ def line_inject(luminosity, std_insert, data_blue, std_blue, data_red, std_red, 
         height_blue = lineflux_insert/ np.sum(makeGaus_bimodal_no_ht(global_params.xaxis_b, shifted_b_1, std_insert/2., shifted_b_2, std_insert/2.)*fit_step)
         height_red = lineflux_insert/ np.sum(makeGaus_bimodal_no_ht(global_params.xaxis_r, shifted_r_1, std_insert/2., shifted_r_2, std_insert/2.)*fit_step)
 
-        # possibly change stds and heights of the different gaussians?
+        # Possibly change stds and heights of the different gaussians
         Lya_line_template_blue = spec.makeGaus_bimodal(global_params.xaxis_b, shifted_b_1, std_insert/2., height_blue, shifted_b_2, std_insert/2., height_blue)
         Lya_line_template_red = spec.makeGaus_bimodal(global_params.xaxis_r, shifted_r_1, std_insert/2., height_red, shifted_r_2, std_insert/2., height_red)
 
     #lineflux_func, lineflux_err_func, SNR_func, line_wav_func, real_bool, spurious_bool = fn.fit_line_func(xaxis_r, Lya_line_template_red, z, shifted_r-60, shifted_r+60, shifted_r, str('/Users/anniekgloudemans/Documents/AA_PhD/Data/WEAVE/scripts_dst/Figures/line_fluxes_output/test/'+'K'+str(0)+'_'+'sky'+'_red'), 'sky_line', False, True, False)#, False, False, False)#True) skew_bool=False, plot_bool=True, final_bool = False
-    # print('lineflux_func', lineflux_func, '+-', lineflux_err_func) # Not right line flux but shouldnt be, because not right wavelength steps
-
-    data_blue_new = []
-    data_red_new = []
+    # print('lineflux_func', lineflux_func, '+-', lineflux_err_func)
+    
+    #---------------------------------------- Injecting emission line -----------------------------------#
 
     if line_wav_insert * (z+1) < 6000:
-        for i in range(len(data_blue)):
-            data_blue_new.append(np.array(data_blue[i]+Lya_line_template_blue))
-            data_red_new.append(np.array(data_red[i]))
-    if line_wav_insert * (z+1) >= 6000: 
-        for i in range(len(data_red)):
-            data_red_new.append(np.array(data_red[i]+Lya_line_template_red))
-            data_blue_new.append(np.array(data_blue[i]))
+        spectra_blue = inject_gaussian(spectra_blue, Lya_line_template_blue)
 
-    return np.array(data_blue_new), np.array(data_red_new)
+    elif line_wav_insert * (z+1) >= 6000: 
+        spectra_red = inject_gaussian(spectra_red, Lya_line_template_red)
+
+
+    return spectra_blue, spectra_red
 
 
 

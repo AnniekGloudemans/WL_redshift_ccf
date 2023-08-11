@@ -5,6 +5,7 @@ from astropy.cosmology import FlatLambdaCDM
 
 import spec_func as spec
 
+
 def init():
 	global cosmo
 	global wavelength_b
@@ -26,6 +27,7 @@ def init():
 	global wav_b_max
 	global bin_counts_blue
 	global bin_counts_red
+	global c
 
 	cosmo = FlatLambdaCDM(H0=70 * u.km / u.s / u.Mpc, Tcmb0=2.725 * u.K, Om0=0.3)
 
@@ -53,5 +55,5 @@ def init():
 	template_std_b = np.full((len(wavelength_b), ), 1e-18) # Add noise to template spectrum - now only used in rebinning func
 	template_std_r = np.full((len(wavelength_r), ), 1e-18)
 	
-	initial_redshifts_fitting = np.linspace(0.0,6.8,69)
-
+	initial_redshifts_fitting = np.concatenate((np.linspace(0.0,1.0,41), np.linspace(1.0,6.8,59)))
+	c = 299792.458 # speed of light in km/s
