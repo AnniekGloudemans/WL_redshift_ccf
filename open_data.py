@@ -15,6 +15,13 @@ def boolean_indexing(v, fillval=np.nan):
     return out
 
 
+def pick_spectrum_weaveio(spec_array, start_num, num_spec):
+	target_bool_array = np.full(len(spec_array), True)
+	target_bool_array[0:start_num] = False
+	target_bool_array[start_num+num_spec:] = False
+	return target_bool_array
+
+
 def pick_spectrum(target_bool_array, start_num, num_spec):
 	idx = np.where(target_bool_array == True)[0]
 	chosen_idx = idx[start_num]
@@ -84,7 +91,10 @@ def input_redshifts_match_weaveio(target_table, input_table):
 	input_redshifts = []
 
 	for i in range(len(target_table)):
-		idx_name = np.where(input_table['TARGNAME'] == target_table['targname'][i])[0] # SHOULD IT NOT BE Z-1??
+		try:
+			idx_name = np.where(input_table['TARGNAME'] == target_table['TARGNAME'][i])[0] # SHOULD IT NOT BE Z-1??
+		except:
+			idx_name = np.where(input_table['TARGNAME'] == target_table['targname'][i])[0]
 		if len(input_table['Z'][idx_name]) > 0:
 			try:
 				input_redshifts.append(input_table['Z'][idx_name][0])
