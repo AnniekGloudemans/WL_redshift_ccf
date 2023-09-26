@@ -3,8 +3,6 @@ import matplotlib
 import matplotlib.gridspec as gridspec
 import time
 import numpy as np
-import global_params
-
 
 # Set colours figures 
 c_blue_spec = 'C0'
@@ -15,7 +13,7 @@ c_general = cmap(0.2)
 c_single_line = cmap(0.4)
 
 
-def plot_spectrum_blue_red_lines(data_blue, data_red, target_name, line_wavelengths, z_ratio, savename, save_fig = False, input_redshift = False, show_plot = False):
+def plot_spectrum_blue_red_lines(spec_blue, spec_red, target_name, line_wavelengths, z_ratio, savename, save_fig = False, input_redshift = False, show_plot = False):
 	"""
 	Plot blue and red spectrum and indicate emission lines found
 
@@ -53,15 +51,15 @@ def plot_spectrum_blue_red_lines(data_blue, data_red, target_name, line_waveleng
 		gs = gridspec.GridSpec(2, len(line_wavelengths))
 
 	ax = fig.add_subplot(gs[0, :])
-	ax.plot(global_params.wavelength_b, data_blue, c=c_blue_spec, alpha=0.7)
-	ax.plot(global_params.wavelength_r, data_red, c=c_red_spec, alpha=0.7)
+	ax.plot(spec_blue.spectral_axis.value, spec_blue.flux.value, c=c_blue_spec, alpha=0.7)
+	ax.plot(spec_red.spectral_axis.value, spec_red.flux.value, c=c_red_spec, alpha=0.7)
 
 	for l in range(len(line_wavelengths)):
 		ax.axvline(line_wavelengths[l], color='grey', linestyle='--')
 
 	ax.set_ylabel(r'Flux (erg cm$^{-2}$ s$^{-1}$ $\AA^{-1}$)', fontsize=14) # per angstrom or not??
 	ax.set_xlabel(r'Observed wavelength ($\AA$)', fontsize=14)
-	ax.set_ylim(np.min(data_red), np.max(data_red)+1e-17)
+	ax.set_ylim(np.min(spec_red.flux.value), np.max(spec_red.flux.value)+1e-17)
 
 	if input_redshift == False:
 		ax.set_title(target_name + r'    z$_{CCF}$ ='+str(np.round(z_ratio,3)), fontsize=14)
@@ -77,15 +75,15 @@ def plot_spectrum_blue_red_lines(data_blue, data_red, target_name, line_waveleng
 		elif i >= 12:
 			ax = fig.add_subplot(gs[3, i-12])
 
-		if line_wavelengths[i] < global_params.wav_r_min:
-			idx_plot_line = np.where((global_params.wavelength_b > line_wavelengths[i]-100) & (global_params.wavelength_b < line_wavelengths[i]+100))
-			ax.plot(global_params.wavelength_b[idx_plot_line], data_blue[idx_plot_line], c=c_blue_spec, alpha=0.7)
-			ax.set_ylim(np.min(data_blue[idx_plot_line])-1e-17, np.max(data_blue[idx_plot_line])+1e-17)
+		if line_wavelengths[i] < min(spec_red.spectral_axis.value):
+			idx_plot_line = np.where((spec_blue.spectral_axis.value > line_wavelengths[i]-100) & (spec_blue.spectral_axis.value < line_wavelengths[i]+100))
+			ax.plot(spec_blue.spectral_axis.value[idx_plot_line], spec_blue.flux.value[idx_plot_line], c=c_blue_spec, alpha=0.7)
+			ax.set_ylim(np.min(spec_blue.flux.value[idx_plot_line])-1e-17, np.max(spec_blue.flux.value[idx_plot_line])+1e-17)
 
-		else:
-			idx_plot_line = np.where((global_params.wavelength_r > line_wavelengths[i]-100) & (global_params.wavelength_r < line_wavelengths[i]+100))
-			ax.plot(global_params.wavelength_r[idx_plot_line], data_red[idx_plot_line], c=c_red_spec, alpha=0.7)
-			ax.set_ylim(np.min(data_red[idx_plot_line])-1e-17, np.max(data_red[idx_plot_line])+1e-17)
+		elif line_wavelengths[i] >= min(spec_red.spectral_axis.value):
+			idx_plot_line = np.where((spec_red.spectral_axis.value > line_wavelengths[i]-100) & (spec_red.spectral_axis.value < line_wavelengths[i]+100))
+			ax.plot(spec_red.spectral_axis.value[idx_plot_line], spec_red.flux.value[idx_plot_line], c=c_red_spec, alpha=0.7)
+			ax.set_ylim(np.min(spec_red.flux.value[idx_plot_line])-1e-17, np.max(spec_red.flux.value[idx_plot_line])+1e-17)
 
 		ax.axvline(line_wavelengths[i], color='grey', linestyle='--')
 		ax.tick_params(labelsize=12)
@@ -116,8 +114,8 @@ def single_line_spectra(specs_blue, specs_red, names, redshifts, line_wavs, line
 
 	for i in range(len(specs_blue)):
 		ax = f.add_subplot(gs1[i])
-		ax.plot(global_params.wavelength_b, specs_blue[i].flux.value, c=c_blue_spec, alpha=0.7)
-		ax.plot(global_params.wavelength_r, specs_red[i].flux.value, c=c_red_spec, alpha=0.7)
+		ax.plot(specs_blue[i].spectral_axis.value, specs_blue[i].flux.value, c=c_blue_spec, alpha=0.7)
+		ax.plot(specs_red[i].spectral_axis.value, specs_red[i].flux.value, c=c_red_spec, alpha=0.7)
 		ax.axvline(line_wavs[i][0], color='grey', linestyle='--') # should only be 1 line
 
 		#ax.set_ylabel(r'Flux (erg cm$^{-2}$ s$^{-1}$ $\AA^{-1}$)', fontsize=12) 
@@ -267,7 +265,7 @@ def plot_continuum_sub(wavs, spectrum, subtracted_spectrum, p, savename):
 	plt.close()
 
 
-def plot_2D_hist(x, y, z, xlabel, ylabel, savename):
+def plot_2D_hist(x, y, z, xlabel, ylabel, cbar_label, savename):
 
 	xticks_array = np.arange(-1+(1/len(x)), 1.0, 2/len(x))
 	yticks_array = np.arange(-1+(1/len(y)), 1.0, 2/len(y))
@@ -286,7 +284,7 @@ def plot_2D_hist(x, y, z, xlabel, ylabel, savename):
 
 	cbar = plt.colorbar(img)
 	cbar.ax.tick_params(labelsize=10)
-	cbar.ax.set_ylabel('Fraction detected', fontsize=10)
+	cbar.ax.set_ylabel(cbar_label, fontsize=10)
 
 	plt.savefig(savename, dpi=100, format='pdf', bbox_inches='tight')
 
@@ -295,7 +293,7 @@ def plot_fraction_detected_vs_redshift(variable_list, redshift, fraction_matrix,
 
 	fig, ax1 = plt.subplots(1,1)
 
-	if type(variable_list) == float:
+	if type(variable_list) == float or type(variable_list) == np.float64:
 		ax1.plot(redshift, fraction_matrix, label='Completeness')
 		ax1.plot(redshift, spurious_matrix, color='k', linestyle='--', label='Spurious lines')
 
@@ -332,21 +330,67 @@ def plot_detected_curves(std_list, lum_list, fraction_matrix, savename):
 	plt.savefig(savename, dpi=100, format='pdf', bbox_inches='tight')
 
 
-def ccf_test_plot(data_blue, data_red, template_r, template_b, ccf_b_sol, ccf_r_sol, r_blue, r_red, z_lag_b, z_lag_r, z_true, savename):
+def plot_injected_lines_std_lum(wavs_b, wavs_r, std_list, lum_list, line_loc, line_temp_blue_list, line_temp_red_list, savename):
+
+	# If line location is nan determine the wavelength
+	if np.isnan(line_loc) == True:
+		if np.max(line_temp_blue_list[0]) > np.max(line_temp_red_list[0]):
+			line_loc = wavs_b[np.argmax(line_temp_blue_list[0])] # lines all at same redshift
+		else:
+			line_loc = wavs_r[np.argmax(line_temp_red_list[0])]
+
+	y_max_plot_blue = 1.05*np.max(line_temp_blue_list)
+	y_max_plot_red = 1.05*np.max(line_temp_red_list)
+
+	f = plt.figure()
+	gs1 = gridspec.GridSpec(len(lum_list),len(std_list))
+	#gs1.update(wspace=0.01, hspace=0.02) 
+
+	for i in range(len(line_temp_blue_list)):
+		ax = f.add_subplot(gs1[i])
+
+		if line_loc < 6000.:
+			ax.plot(wavs_b, line_temp_blue_list[i], c=c_blue_spec, alpha=0.7)
+			ax.set_ylim(0.0, y_max_plot_blue) 
+		else:
+			ax.plot(wavs_r, line_temp_red_list[i], c=c_red_spec, alpha=0.7)
+			ax.set_ylim(0.0, y_max_plot_red)
+
+		ax.set_xlim(line_loc-60., line_loc+60)
+		ax.tick_params(labelsize=8)
+
+		if i%len(std_list) == 0:
+			ax.text(0.1, 0.8, "Lum = "+ str(lum_list[int(i/len(std_list))]), transform=ax.transAxes, fontsize=8, verticalalignment='bottom')
+		if i < len(std_list):
+			ax.text(0.65, 0.8, "STD = "+ str(std_list[i]), transform=ax.transAxes, fontsize=8, verticalalignment='bottom')
+
+		# #ax.set_ylabel(r'Flux (erg cm$^{-2}$ s$^{-1}$ $\AA^{-1}$)', fontsize=12) 
+
+		# ax.set_title(str(names[i]) + '   z='+str(np.round(redshifts[i],2)), fontsize=10)
+		
+		# if i == int(len(std_list)/2):
+		# 	ax.set_xlabel(r'Observed wavelength ($\AA$)', fontsize=12)
+
+	plt.savefig(savename, dpi=100, format='pdf')#, bbox_inches='tight')
+	plt.close()
+
+
+
+def ccf_test_plot(spec_blue, spec_red, template_r, template_b, ccf_b_sol, ccf_r_sol, r_blue, r_red, z_lag_b, z_lag_r, z_true, savename):
 
 
     Fig, (Ax1, Ax2, Ax3, Ax4) = plt.subplots(4,1, figsize=(10,8))
 
-    Ax1.plot(global_params.wavelength_b, data_blue.flux.value, c=c_blue_spec, alpha=0.8)
-    Ax1.plot(global_params.wavelength_r, data_red.flux.value, c=c_red_spec, alpha=0.8)
-    Ax1.set_ylim(np.min(data_red.flux.value), np.max(data_red.flux.value)+1e-17)
+    Ax1.plot(spec_blue.spectral_axis.value, spec_blue.flux.value, c=c_blue_spec, alpha=0.8)
+    Ax1.plot(spec_red.spectral_axis.value, spec_red.flux.value, c=c_red_spec, alpha=0.8)
+    Ax1.set_ylim(np.min(spec_red.flux.value), np.max(spec_red.flux.value)+1e-17)
     #Ax1.text(0.1, 0.8, "Spectrum", transform=Ax1.transAxes, fontsize=16, verticalalignment='bottom')
     Ax1.set_title('Spectrum', fontsize=16)
     #Ax1.set_xlabel(r'Observed wavelength ($\AA$)', fontsize=12)
 
-    Ax2.plot(global_params.wavelength_b, template_b, c=c_blue_spec, alpha=0.8)
-    Ax2.plot(global_params.wavelength_r, template_r, c=c_red_spec, alpha=0.8)
-    Ax2.set_ylim(np.min(data_red.flux.value), np.max(data_red.flux.value)+1e-17)
+    Ax2.plot(spec_blue.spectral_axis.value, template_b, c=c_blue_spec, alpha=0.8)
+    Ax2.plot(spec_red.spectral_axis.value, template_r, c=c_red_spec, alpha=0.8)
+    Ax2.set_ylim(np.min(spec_red.flux.value), np.max(spec_red.flux.value)+1e-17)
     Ax2.set_ylabel(r'                                     Flux (erg cm$^{-2}$ s$^{-1}$ $\AA^{-1}$)', fontsize=12)
     Ax2.set_title("Template", fontsize=16)
     #Ax2.text(0.1, 0.8, "Template", transform=Ax2.transAxes, fontsize=16, verticalalignment='bottom')

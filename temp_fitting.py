@@ -16,14 +16,13 @@ import emission_lines as line
 import open_data as read_data
 import spec_func as spec
 import ccf_func as ccf
-import global_params
-import pdb
+
 from specutils.analysis import template_logwl_resample 
 from specutils import Spectrum1D
 
 
 
-def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red, target_names, run_name, mask_blue = False, mask_red = False, input_redshift_list = False, save_plot_bool = False, write_to_table_bool = True, print_bool = False, diagnostic_plot_bool = False, show_result_bool = False, fix_redshift = False):
+def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red, target_names, run_name, mask_blue = False, mask_red = False, input_redshift_list = False, save_plot_bool = False, write_to_table_bool = True, print_bool = False, diagnostic_plot_bool = False, show_result_bool = False, fix_redshift = False, inject_bool = False):
 	"""
 	Calculate redshifts and identify emission lines in the spectra
 	
@@ -113,7 +112,7 @@ def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red,
 
 
 		if fix_redshift == True: # If the redshift is fixed skip the CCF
-			line_wav_list, line_flux_list, line_snr_list = line.finding_emission_lines(spectra_blue[i].flux.value, spectra_blue[i].uncertainty, spectra_red[i].flux.value, spectra_red[i].uncertainty, [input_redshift_list[i]], True, diagnostic_plot_bool, '../Output_ccf/Figures/emission_lines_output/emission_lines_'+run_name+'/emission_line_') #  True, False,
+			line_wav_list, line_flux_list, line_snr_list = line.finding_emission_lines(spectra_blue[i], spectra_red[i], [input_redshift_list[i]], True, diagnostic_plot_bool, '../Output_ccf/Figures/emission_lines_output/emission_lines_'+run_name+'/emission_line_') #  True, False,
 			
 			line_wavs_all_targets.append(line_wav_list)
 			line_fluxes_all_targets.append(line_flux_list)
@@ -126,7 +125,7 @@ def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red,
 				single_line_bool_all_targets.append(False)
 
 			if save_plot_bool == True:
-				plot.plot_spectrum_blue_red_lines(spectra_blue[i].flux.value, spectra_red[i].flux.value, target_names[i], line_wav_list, np.nan, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(target_names[i])+'.pdf', save_plot_bool, input_redshift_list[i], show_result_bool) 
+				plot.plot_spectrum_blue_red_lines(spectra_blue[i], spectra_red[i], target_names[i], line_wav_list, np.nan, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(target_names[i])+'.pdf', save_plot_bool, input_redshift_list[i], show_result_bool) 
 
 			continue
 
@@ -140,7 +139,7 @@ def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red,
 			single_line_bool_all_targets.append(False)#np.nan)
 
 			if save_plot_bool == True:
-				plot.plot_spectrum_blue_red_lines(spectra_blue[i].flux.value, spectra_red[i].flux.value, target_names[i], [], np.nan, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(target_names[i])+'_abs.pdf', save_plot_bool, input_redshift_list[i], show_result_bool)
+				plot.plot_spectrum_blue_red_lines(spectra_blue[i], spectra_red[i], target_names[i], [], np.nan, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(target_names[i])+'_abs.pdf', save_plot_bool, input_redshift_list[i], show_result_bool)
 			continue 
 
 		if print_bool == True:
@@ -153,7 +152,6 @@ def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red,
 		# # Preprocess the spectrum
 		# data_blue[i] = spec.preprocess_spectra(data_blue[i], 'blue')#, True, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/cont_sub_spectrum_blue_'+str(target_names[i])+'.pdf')
 		# data_red[i] = spec.preprocess_spectra(data_red[i], 'red')#, True, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/cont_sub_spectrum_red_'+str(target_names[i])+'.pdf')
-
 
 		# Run the cross-correlation
 		ccf_redshifts, z_lag_list = ccf.ccf_function(spectra_blue[i], spectra_red[i])
@@ -174,7 +172,7 @@ def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red,
 		# If CCF solution found then check if emission lines are real and determine the redshift by calculating the wavelength ratios
 		if len(z_lag_list) > 0:
 
-			line_wav_list, line_flux_list, line_snr_list = line.finding_emission_lines(spectra_blue[i].flux.value, spectra_blue[i].uncertainty, spectra_red[i].flux.value, spectra_red[i].uncertainty, ccf_redshifts_clean, False, diagnostic_plot_bool, '../Output_ccf/Figures/emission_lines_output/emission_lines_'+run_name+'/emission_line_')
+			line_wav_list, line_flux_list, line_snr_list = line.finding_emission_lines(spectra_blue[i], spectra_red[i], ccf_redshifts_clean, False, diagnostic_plot_bool, '../Output_ccf/Figures/emission_lines_output/emission_lines_'+run_name+'/emission_line_')
 			
 			if print_bool == True:
 				print('Lines detected before final = ', line_wav_list)
@@ -191,7 +189,7 @@ def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red,
 				print('Ratio redshift', ratio_redshift)
 
 			if np.isnan(ratio_redshift) == False: # If found a redshift from ratio's then check if there are any additional emission lines that were missed
-				line_wav_list_extra, line_flux_list_extra, line_snr_list_extra = line.finding_emission_lines(spectra_blue[i].flux.value, spectra_blue[i].uncertainty, spectra_red[i].flux.value, spectra_red[i].uncertainty, np.array([ratio_redshift]), True, diagnostic_plot_bool, '../Output_ccf/Figures/emission_lines_output/emission_lines_'+run_name+'/emission_line_') #  True, False,
+				line_wav_list_extra, line_flux_list_extra, line_snr_list_extra = line.finding_emission_lines(spectra_blue[i], spectra_red[i], np.array([ratio_redshift]), True, diagnostic_plot_bool, '../Output_ccf/Figures/emission_lines_output/emission_lines_'+run_name+'/emission_line_') #  True, False,
 				
 				# Merge the two lists 
 				for p, line_wav in enumerate(line_wav_list_extra):
@@ -211,7 +209,7 @@ def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red,
 			Ha_line_idx = (ratio_redshift<0.46)*(np.array(line_wav_list)-25 <(1.+ratio_redshift)*6563)*(np.array(line_wav_list)+25 >(1.+ratio_redshift)*6563)
 
 			if np.sum(Ha_line_idx) > 0:
-				line_wav_Ha, line_flux_Ha, line_snr_Ha = line.fit_double_gauss((1+ratio_redshift)*6563., global_params.wavelength_r, spectra_red[i].flux.value, ratio_redshift, diagnostic_plot_bool, '../Output_ccf/Figures/emission_lines_output/emission_lines_'+run_name+'/emission_line_Ha_double_gauss.pdf')
+				line_wav_Ha, line_flux_Ha, line_snr_Ha, sep_peaks_Ha, reduced_chisq_Ha = line.fit_double_gauss(spectra_red[i], (1+ratio_redshift)*6563., diagnostic_plot_bool, '../Output_ccf/Figures/emission_lines_output/emission_lines_'+run_name+'/emission_line_Ha_double_gauss.pdf', False)
 
 				# insert new Ha line wavelength and flux
 				if np.isnan(line_wav_Ha) == True:
@@ -220,6 +218,20 @@ def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red,
 					line_wav_list[Ha_line_idx] = line_wav_Ha
 					line_flux_list[Ha_line_idx] = line_flux_Ha
 					line_snr_list[Ha_line_idx] = line_snr_Ha
+
+			# Classify the single emission lines
+			if len(line_wav_list) == 1:
+
+				# Check if OII, OIII, Lya or CIV
+				linename, ratio_redshift, line_wav_list, line_flux_list, line_snr_list = line.single_emission_line(spectra_blue[i], spectra_red[i], line_wav_list[0], diagnostic_plot_bool, '../Output_ccf/Figures/emission_lines_output/emission_lines_'+run_name+'/emission_line_')
+				
+				if np.isnan(line_wav_list[0]) == False: # Check if single line was real
+					single_line_bool_all_targets.append(True)
+				else:
+					single_line_bool_all_targets.append(False)
+
+			else:
+				single_line_bool_all_targets.append(False)
 
 			# Save line results to lists
 			ratio_redshifts_all_targets.append(ratio_redshift)
@@ -230,6 +242,7 @@ def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red,
 		else:
 			ratio_redshift = np.nan
 			ratio_redshifts_all_targets.append(ratio_redshift)
+			single_line_bool_all_targets.append(False)
 
 			# if fix_redshift == False:
 			line_wavs_all_targets.append(np.array([]))
@@ -237,29 +250,14 @@ def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red,
 			line_snr_all_targets.append(np.array([]))
 			line_wav_list = np.array([])
 
-		# Investigate single emission lines
-		try:
-			if len(line_wav_list) == 1:
-				single_line_bool = True
-				# Check if OII, OIII, Lya or CIV
-				#line.single_emission_line(data_blue[i], data_red[i], line_wav_list[0])
-			else:
-				single_line_bool = False
-		except: # e.g. if there is no line_wav_list
-			single_line_bool = False
-
-		single_line_bool_all_targets.append(single_line_bool)
-
-
 	#-------------------------------------------------- Save results --------------------------------------------------
 
 		if save_plot_bool == True or show_result_bool == True:
 			try:
-				plot.plot_spectrum_blue_red_lines(spectra_blue[i].flux.value, spectra_red[i].flux.value, target_names[i], line_wav_list, ratio_redshift, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(target_names[i])+'.pdf', save_plot_bool, input_redshift_list[i], show_result_bool) 
+				plot.plot_spectrum_blue_red_lines(spectra_blue[i], spectra_red[i], target_names[i], line_wav_list, ratio_redshift, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(target_names[i])+'.pdf', save_plot_bool, input_redshift_list[i], show_result_bool) 
 			except: # if input_redshift = False
-				plot.plot_spectrum_blue_red_lines(spectra_blue[i].flux.value, spectra_red[i].flux.value, target_names[i], line_wav_list, ratio_redshift, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(target_names[i])+'.pdf', save_plot_bool, False, show_result_bool)
+				plot.plot_spectrum_blue_red_lines(spectra_blue[i], spectra_red[i], target_names[i], line_wav_list, ratio_redshift, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(target_names[i])+'.pdf', save_plot_bool, False, show_result_bool)
 
-	
 	# Write to table
 	if write_to_table_bool == True:
 		try:
@@ -269,7 +267,7 @@ def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red,
 			#traceback.print_exc()
 			print('Cannot write to file')
 
-	if save_plot_bool == True:
+	if save_plot_bool == True and inject_bool == False:
 
 		try:
 			plot.ccf_redshift_output(ratio_redshifts_all_targets, '../Output_ccf/Figures/ccf_performance/ccf_redshifts_'+run_name+'.pdf', single_line_bool_all_targets)
@@ -290,10 +288,11 @@ def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red,
 					print('Number single line targets found = ', np.nansum(single_line_bool_all_targets))
 
 			except:
-				print('No input redshift, so cannot determine percentage correct')
+				print('No input redshift or no lines found, so cannot determine percentage correct')
+
 		except Exception as e:
 			print('Error in plotting')
-			#print(e)
+			print(e)
 	else:
 		print('Number single line targets found = ', np.nansum(single_line_bool_all_targets))
 

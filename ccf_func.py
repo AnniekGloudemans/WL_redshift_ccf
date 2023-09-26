@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 from astropy import units as u
-import global_params
+
 import spec_func as spec
 trunc = lambda f: f - f % 0.01
 import traceback
@@ -11,57 +11,68 @@ from specutils.analysis import correlation
 from specutils import Spectrum1D
 import plotting as plot
 
+initial_redshifts_fitting = np.linspace(0.0,6.8,69)
+gal_zip = spec.prepare_template(key='AGN')
+
 
 def ccf_algorithm(z, spec_b, spec_r):
     """
     Determine cross correlation values between data and template
 
-	Keyword arguments:
-	z (float) -- redshift to test
+    Keyword arguments:
+    z (float) -- redshift to test
     spec_(b/r) -- rebinned blue/red spectrum
 
-	Return:
-	z_lag_(r/b) (float) -- ccf offset
-	r_(blue/red) (float) -- strenght of correlation
+    Return:
+    z_lag_(r/b) (float) -- ccf offset
+    r_(blue/red) (float) -- strenght of correlation
 
     """
 
-    tem_r = spec.shift_template(global_params.gal_zip, global_params.xaxis_r, z, 'r')
-    tem_b = spec.shift_template(global_params.gal_zip, global_params.xaxis_b, z, 'b')
+    tem_r = spec.shift_template(gal_zip, np.arange(0, len(spec_r.spectral_axis.value), 1), z, 'r', np.min(spec_b.spectral_axis.value), np.max(spec_b.spectral_axis.value), np.min(spec_r.spectral_axis.value), np.max(spec_r.spectral_axis.value))
+    tem_b = spec.shift_template(gal_zip, np.arange(0, len(spec_b.spectral_axis.value), 1), z, 'b', np.min(spec_b.spectral_axis.value), np.max(spec_b.spectral_axis.value), np.min(spec_r.spectral_axis.value), np.max(spec_r.spectral_axis.value))
 
 
     if z < 0.0: # Don't try to correlate if redshift is negative
         return np.nan, np.nan, np.nan, np.nan
 
-    spec_tem_r = Spectrum1D(spectral_axis=global_params.wavelength_r*u.AA, flux=tem_r * u.Unit('erg cm-2 s-1 AA-1'))
-    spec_tem_b = Spectrum1D(spectral_axis=global_params.wavelength_b*u.AA, flux=tem_b * u.Unit('erg cm-2 s-1 AA-1'))
+    spec_tem_r = Spectrum1D(spectral_axis=spec_r.spectral_axis, flux=tem_r * u.Unit('erg cm-2 s-1 AA-1')) #
+    spec_tem_b = Spectrum1D(spectral_axis=spec_b.spectral_axis, flux=tem_b * u.Unit('erg cm-2 s-1 AA-1')) #
 
     # Rebin spectrum and template onto common log-scale
     rebin_val_b, rebin_val_temb = template_logwl_resample(spec_b, spec_tem_b)
     rebin_val_r, rebin_val_temr = template_logwl_resample(spec_r, spec_tem_r)
 
-    # Cross-correlate with template
-    ccf_b, lag = correlation.template_correlate(rebin_val_b, rebin_val_temb) 
-    ccf_r, lag = correlation.template_correlate(rebin_val_r, rebin_val_temr)
+    # # Cross-correlate with template
+    # ccf_b, lag = correlation.template_correlate(rebin_val_b, rebin_val_temb) 
+    # ccf_r, lag = correlation.template_correlate(rebin_val_r, rebin_val_temr)
+
+    # lag_r = (np.argmax(ccf_r) - ((len(ccf_r) + 0) / 2)) # Change this? 
+    # lag_b = (np.argmax(ccf_b) - ((len(ccf_b) + 0) / 2))
+    # print('ccf_b, lag_b', ccf_b, lag_b)
+    # print('ccf_r, lag_r', ccf_r, lag_r)
+
+    # Numpy faster than correlation.template_correlate: 
+    ccf_b = np.correlate(rebin_val_b.flux.value, rebin_val_temb.flux.value, 'full') 
+    ccf_r = np.correlate(rebin_val_r.flux.value, rebin_val_temr.flux.value, 'full')
+
+    lag_r = (np.argmax(ccf_r) - ((len(ccf_r) + 0) / 2))
+    lag_b = (np.argmax(ccf_b) - ((len(ccf_b) + 0) / 2))
 
     r_red = ((np.ndarray.max(ccf_r) * np.ndarray.mean(ccf_r)) / np.std(ccf_r)) * 1e32
     r_blue = ((np.ndarray.max(ccf_b) * np.ndarray.mean(ccf_b)) / np.std(ccf_b)) * 1e32
 
     pix_width_r = (np.log(max(rebin_val_r.spectral_axis.value)) - np.log(min(rebin_val_r.spectral_axis.value)))/len(rebin_val_r.spectral_axis)
     pix_width_b = (np.log(max(rebin_val_b.spectral_axis.value)) - np.log(min(rebin_val_b.spectral_axis.value)))/len(rebin_val_b.spectral_axis)
-    
-    lag_r = (np.argmax(ccf_r) - ((len(ccf_r) + 0) / 2))
-    lag_b = (np.argmax(ccf_b) - ((len(ccf_b) + 0) / 2))
+
 
     z_lag_r = round((10 ** (pix_width_r * lag_r) * (1 + (30 / 3e5)) - 1), 5)
     z_lag_b = round((10 ** (pix_width_b * lag_b) * (1 + (30 / 3e5)) - 1), 5)
 
-
     return z_lag_r, r_blue, r_red, z_lag_b
 
 
-
-def ccf_function(spec_blue, spec_red):#, rebin_val_b, rebin_val_r, log_wvlngth_temb_z_blue_list, rebin_val_temb_z_blue_list, log_wvlngth_temr_z_red_list, rebin_val_temr_z_red_list):
+def ccf_function(spec_blue, spec_red):
     """
     Run CCF algorithm to find spectroscopic redshift
 
@@ -91,7 +102,7 @@ def ccf_function(spec_blue, spec_red):#, rebin_val_b, rebin_val_r, log_wvlngth_t
     ########### Round 1 ##############
     # In round 1 the standard initial redshifts are used
 
-    for i, z in enumerate(global_params.initial_redshifts_fitting): 
+    for i, z in enumerate(initial_redshifts_fitting): 
 
         z_lag_r, r_blue, r_red, z_lag_b = ccf_algorithm(z, spec_blue, spec_red)
 
@@ -104,7 +115,9 @@ def ccf_function(spec_blue, spec_red):#, rebin_val_b, rebin_val_r, log_wvlngth_t
         if print_bool == True:
             print('round 1', z, z_lag_r, r_red, z_lag_b, r_blue)
 
+
     ########### Round 2 ##############
+
     count = 0
     for trial_z, trialz_lag_r in z_guess_list1: 
         z = trial_z + trialz_lag_r
@@ -137,7 +150,9 @@ def ccf_function(spec_blue, spec_red):#, rebin_val_b, rebin_val_r, log_wvlngth_t
 
         count += 1
 
+
     ########### Round 3 ##############
+
     for trial_z, trialz_lag_r in z_guess_list2:
         z = trial_z + trialz_lag_r
 
@@ -160,7 +175,9 @@ def ccf_function(spec_blue, spec_red):#, rebin_val_b, rebin_val_r, log_wvlngth_t
         if (z_lag_b > -0.015 and z_lag_b <= 0.015): #-0.01, #0.012): 
             z_guess_list3_blue.append((z, z_lag_b))
 
+
     ########### Round 4 ##############
+
     for trial_z, trialz_lag_r in z_guess_list3:
         z = trial_z + trialz_lag_r
 
@@ -169,7 +186,7 @@ def ccf_function(spec_blue, spec_red):#, rebin_val_b, rebin_val_r, log_wvlngth_t
         z_lag_r = 999
         count = 0
 
-        while (z_lag_r > 0.001 or z_lag_r < -0.001 and count < 8): # count was 6
+        while (z_lag_r > 0.001 or z_lag_r < -0.001 and count < 8): # count was 8
             count += 1
             z_lag_r, r_blue, r_red, z_lag_b = ccf_algorithm(z, spec_blue, spec_red)
             z = z+z_lag_r
@@ -223,7 +240,7 @@ def ccf_test(true_z, data_blue_test, data_red_test, save_fig, save_name):
     ccf_r_all = []
     ccf_b_all = []
 
-    for i, z in enumerate(global_params.initial_redshifts_fitting): 
+    for i, z in enumerate(initial_redshifts_fitting): 
 
         # already rebinned the data in advance
         z_lag_r, r_blue, r_red, z_lag_b = ccf_algorithm(z, data_blue_test[0], data_red_test[0])#ccf_algorithm(z, rebin_val_b, rebin_val_r)
@@ -255,8 +272,8 @@ def ccf_test(true_z, data_blue_test, data_red_test, save_fig, save_name):
     ccf_b_all = np.array(ccf_b_all)
 
     # How shifted template looks like at true redshift
-    tem_r = spec.shift_template(global_params.gal_zip, global_params.xaxis_r, true_z, 'r') 
-    tem_b = spec.shift_template(global_params.gal_zip, global_params.xaxis_b, true_z, 'b')
+    tem_r = spec.shift_template(gal_zip, np.arange(0, len(data_red_test.spectral_axis.value), 1), true_z, 'r', np.min(data_blue_test.spectral_axis.value), np.max(data_blue_test.spectral_axis.value), np.min(data_red_test.spectral_axis.value), np.max(data_red_test.spectral_axis.value)) 
+    tem_b = spec.shift_template(gal_zip, np.arange(0, len(data_blue_test.spectral_axis.value), 1), true_z, 'b', np.min(data_blue_test.spectral_axis.value), np.max(data_blue_test.spectral_axis.value), np.min(data_red_test.spectral_axis.value), np.max(data_red_test.spectral_axis.value))
 
     if save_fig == True:
         plot.ccf_test_plot(data_blue_test[0], data_red_test[0], tem_r, tem_b, ccf_b_all, ccf_r_all, r_blue, r_red, z_lag_b, z_lag_r, true_z, save_name)

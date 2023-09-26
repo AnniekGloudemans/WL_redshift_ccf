@@ -1,7 +1,7 @@
 from astropy.io import fits
 from astropy.table import Table
 import numpy as np
-import global_params
+
 from astropy import units as u
 from astropy.nddata import StdDevUncertainty
 from specutils import Spectrum1D
@@ -33,47 +33,75 @@ def pick_spectrum(target_bool_array, start_num, num_spec):
 	return target_bool_array
 
 
-def open_input_data_specutils(file_path, arm): 
+def readin_spectra(fname):
+	f = fits.open(fname)
+	hdr0 = f[0].header
+	hdr = f[1].header
+	table = Table.read(fname)
+
+	sz = hdr['NAXIS1']
+	dwl = hdr['CD1_1']
+	wl0 = hdr['CRVAL1']
+	wl = np.arange(sz)*dwl + wl0
+
+	if hdr0['CAMERA'] == 'WEAVEBLUE':
+		arm = 'BLUE'
+	else: 
+		arm = 'RED'
+
+	spec = f[1].data * f[5].data * u.Unit('erg cm-2 s-1 AA-1')
+	std = (f[5].data / np.sqrt(f[2].data)) * u.Unit('erg cm-2 s-1 AA-1')
+
+	spectra_array = []
+	for i in range(len(spec)):
+		spec1D = Spectrum1D(spectral_axis=wl*u.AA, flux=spec[i], uncertainty=StdDevUncertainty(std[i]))
+		spectra_array.append(spec1D)
+
+	output = {'arm':arm, 'wl':wl, 'spectra':np.array(spectra_array), 'std':std, 'table':table, 'header':hdr, 'h0':hdr0}
+	return output
+
+
+# def open_input_data_specutils(file_path, arm): 
 	
-	file = fits.open(file_path)
-	table = Table.read(file_path)
+# 	file = fits.open(file_path)
+# 	table = Table.read(file_path)
 
-	spec_flux = (file[1].data*file[5].data)* u.Unit('erg cm-2 s-1 AA-1') 
-	spec_std = (file[3].data*file[5].data)* u.Unit('erg cm-2 s-1 AA-1') 
+# 	spec_flux = (file[1].data*file[5].data)* u.Unit('erg cm-2 s-1 AA-1') 
+# 	spec_std = (file[3].data*file[5].data)* u.Unit('erg cm-2 s-1 AA-1') 
 
-	if arm == 'r':
-		lamb = global_params.wavelength_r*u.AA
-	elif arm == 'b':
-		lamb = global_params.wavelength_b*u.AA
+# 	if arm == 'r':
+# 		lamb = global_params.wavelength_r*u.AA
+# 	elif arm == 'b':
+# 		lamb = global_params.wavelength_b*u.AA
 
-	uncertainty = StdDevUncertainty(0.001*1e-17*np.ones(len(lamb))*u.Unit('erg cm-2 s-1 AA-1')) # CHANGE! 
+# 	uncertainty = StdDevUncertainty(0.001*1e-17*np.ones(len(lamb))*u.Unit('erg cm-2 s-1 AA-1')) # CHANGE! 
 
-	spectra_array = []
-	for i in range(len(spec_flux)):
-		spec = Spectrum1D(spectral_axis=lamb, flux=spec_flux[i], uncertainty=uncertainty)#spec_std)
-		spectra_array.append(spec)
+# 	spectra_array = []
+# 	for i in range(len(spec_flux)):
+# 		spec = Spectrum1D(spectral_axis=lamb, flux=spec_flux[i], uncertainty=uncertainty)#spec_std)
+# 		spectra_array.append(spec)
 
-	return file, table, np.array(spectra_array)
+# 	return file, table, np.array(spectra_array)
 
 
-def open_input_data_specutils_weaveio(data_table, arm): 
+# def open_input_data_specutils_weaveio(data_table, arm): 
 
-	spec_flux = (data_table['flux']*data_table['sensfunc'])* u.Unit('erg cm-2 s-1 AA-1') 
-	spec_std = (data_table['ivar']*data_table['sensfunc'])* u.Unit('erg cm-2 s-1 AA-1') 
+# 	spec_flux = (data_table['flux']*data_table['sensfunc'])* u.Unit('erg cm-2 s-1 AA-1') 
+# 	spec_std = (data_table['ivar']*data_table['sensfunc'])* u.Unit('erg cm-2 s-1 AA-1') 
 
-	if arm == 'r':
-		lamb = global_params.wavelength_r*u.AA
-	elif arm == 'b':
-		lamb = global_params.wavelength_b*u.AA
+# 	if arm == 'r':
+# 		lamb = global_params.wavelength_r*u.AA
+# 	elif arm == 'b':
+# 		lamb = global_params.wavelength_b*u.AA
 
-	uncertainty = StdDevUncertainty(0.001*1e-17*np.ones(len(lamb))*u.Unit('erg cm-2 s-1 AA-1')) # CHANGE! 
+# 	uncertainty = StdDevUncertainty(0.001*1e-17*np.ones(len(lamb))*u.Unit('erg cm-2 s-1 AA-1')) # CHANGE! 
 
-	spectra_array = []
-	for i in range(len(spec_flux)):
-		spec = Spectrum1D(spectral_axis=lamb, flux=spec_flux[i], uncertainty=uncertainty)#spec_std)
-		spectra_array.append(spec)
+# 	spectra_array = []
+# 	for i in range(len(spec_flux)):
+# 		spec = Spectrum1D(spectral_axis=lamb, flux=spec_flux[i], uncertainty=uncertainty)#spec_std)
+# 		spectra_array.append(spec)
 
-	return np.array(spectra_array)
+# 	return np.array(spectra_array)
 
 
 def input_redshifts_match_weaveio(target_table, input_table):
