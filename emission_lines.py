@@ -169,9 +169,9 @@ def fit_gaussian(spec, lineloc, linename, fit_line_region, plot_bool = False, sa
 
             spurious_bool = False
 
-            if (cen_fit < min(fit_wav)+100 or cen_fit > max(fit_wav)-100) and SNR < 20.: # Not on edge of blue or red spectrum
+            if (cen_fit < min(spec.spectral_axis.value)+100 or cen_fit > max(spec.spectral_axis.value)-100) and SNR < 20.: # Not on edge of blue or red spectrum
                 spurious_bool = True
-            elif np.logical_or(abs(cen_fit-5510) < 60, abs(cen_fit-7630) < 90): # Not in one of the gaps 
+            elif np.logical_or(abs(cen_fit-5510) < 60, abs(cen_fit-7630) < 90): # Not in one of the gaps --> Don't harcode these!
                 spurious_bool = True
             elif abs(cen_fit-lineloc) > 15.0 and SNR < 10.0 and linename != 'OIII-4959': # Do not allow any low SNR lines with a large wavelength offset
                 spurious_bool = True
