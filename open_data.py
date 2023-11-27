@@ -1,6 +1,8 @@
 from astropy.io import fits
 from astropy.table import Table
 import numpy as np
+import numpy.ma as ma
+import pdb 
 
 from astropy import units as u
 from astropy.nddata import StdDevUncertainty
@@ -23,6 +25,9 @@ def pick_spectrum_weaveio(spec_array, start_num, num_spec):
 
 
 def pick_spectrum(target_bool_array, start_num, num_spec):
+	mask_bool = ma.getmask(target_bool_array)
+	target_bool_array[mask_bool] = False # Set masked values to False
+
 	idx = np.where(target_bool_array == True)[0]
 	chosen_idx = idx[start_num]
 	target_bool_array[0:chosen_idx] = False
@@ -268,4 +273,38 @@ def write_to_table(table_blue, table_red, z_ccfs, line_wavs, line_fluxes, line_s
 		table_blue_write.write(savename+'_ccf_results_blue.fits', overwrite=True)
 		table_red_write.write(savename+'_ccf_results_red.fits', overwrite=True)
 
+
+
+def write_to_table_injecting_lines(table_blue, table_red, new_column_names, z_ccfs, line_wavs, line_fluxes, savename):
+	"""
+	Write resulting redshift and emission lines to orginial table for the 
+
+	"""
+	table_blue_write = table_blue
+	table_red_write = table_red
+
+	# try:
+	with warnings.catch_warnings():  # Ignore warnings
+		warnings.simplefilter('ignore')
+
+		for i,column_name in enumerate(new_column_names):
+
+			line_wavs_write = boolean_indexing(line_wavs[i])
+			line_fluxes_write = boolean_indexing(line_fluxes[i])
+
+			z_ccfs_col = Table.Column(name=str(column_name)+'_ccf_redshift', data=np.array(z_ccfs[i]))
+			line_wavs_col = Table.Column(name=str(column_name)+'_line_wavs', data=np.array(line_wavs_write), unit=u.AA)
+			line_fluxes_col = Table.Column(name=str(column_name)+'_line_fluxes', data=np.array(line_fluxes_write))
+
+			table_blue_write.add_column(z_ccfs_col)
+			table_red_write.add_column(z_ccfs_col)
+			table_blue_write.add_column(line_wavs_col)
+			table_red_write.add_column(line_wavs_col)
+			table_blue_write.add_column(line_fluxes_col)
+			table_red_write.add_column(line_fluxes_col)
+
+		table_blue_write.write(savename+'_ccf_results_blue.fits', overwrite=True)
+		table_red_write.write(savename+'_ccf_results_red.fits', overwrite=True)
+	# except:
+	# 	pdb.set_trace()
 

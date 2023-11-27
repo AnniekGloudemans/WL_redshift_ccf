@@ -2,6 +2,7 @@ import plotting as plot
 import temp_fitting as temp
 import spec_func as spec
 import numpy as np
+import open_data as read_data
 
 
 def line_detected_check(line_wavs, line_wav_rest_inject, line_type_inject, redshifts, redshift_inject):
@@ -45,7 +46,7 @@ def line_detected_check(line_wavs, line_wav_rest_inject, line_type_inject, redsh
 	return line_detected_bool, spurious_lines, correct_redshift_bool
 
 
-def inject_gaussian_lines(linewav_rest_inject, line_type, redshift_inject, lum_inject, std_inject, data_blue, data_red, data_table_blue, data_table_red, target_names, run_name, mask_blue = False, mask_red = False, save_plot_bool = False, print_bool = False, diagnostic_bool = False, show_result_bool = False):
+def inject_gaussian_lines(linewav_rest_inject, line_type, redshift_inject, lum_inject, std_inject, data_blue, data_red, data_table_blue, data_table_red, target_names, run_name, mask_blue = False, mask_red = False, save_plot_bool = False, write_to_table_bool = False, print_bool = False, diagnostic_bool = False, show_result_bool = False):
 	"""
 	Inject gaussian emission lines in multiple spectra and determine success rate of detection by the algorithm
 
@@ -80,8 +81,14 @@ def inject_gaussian_lines(linewav_rest_inject, line_type, redshift_inject, lum_i
 	chipgap_blue = spec.find_chipgaps(data_blue[0], mask_blue, 'b')
 	chipgap_red = spec.find_chipgaps(data_red[0], mask_red, 'r')
 
+	z_ccfs_full_run = []
+	line_wavs_full_run = []
+	line_fluxes_full_run = []
+	column_names = []
+
 	# ---------------------------------- Fixed redshift -----------------------------------
 	if type(redshift_inject) == float:
+
 		line_detected_fraction_matrix = []
 		spurious_lines_matrix = []	
 		correct_redshift_matrix = []
@@ -110,6 +117,12 @@ def inject_gaussian_lines(linewav_rest_inject, line_type, redshift_inject, lum_i
 				line_temp_blue_list.append(line_temp_blue)
 				line_temp_red_list.append(line_temp_red)
 
+				z_ccfs_full_run.append(redshifts_template_fitting)
+				line_wavs_full_run.append(emission_line_wavelengths)
+				line_fluxes_full_run.append(emission_line_fluxes)
+
+				column_names.append('lum'+str(np.round(np.log10(lum),2))+'_std'+str(std))
+
 			line_detected_fraction_matrix.append(line_detected_fraction)
 			spurious_lines_matrix.append(spurious_lines)
 			correct_redshift_matrix.append(correct_redshift_fraction)
@@ -122,9 +135,12 @@ def inject_gaussian_lines(linewav_rest_inject, line_type, redshift_inject, lum_i
 			plot.plot_2D_hist(std_inject, np.log10(lum_inject), correct_redshift_matrix, r'$\sigma_{inject}$' , 'Lum$_{inject}$', 'Fraction correct redshift', '../Output_ccf/Figures/ccf_performance/inject_redshift_2D_hist_'+str(run_name)+'.pdf')
 			plot.plot_injected_lines_std_lum(data_blue_inject[0].spectral_axis.value, data_red_inject[0].spectral_axis.value, std_inject, np.log10(lum_inject), linewav_rest_inject*(1.+redshift_inject), line_temp_blue_list, line_temp_red_list, '../Output_ccf/Figures/ccf_performance/inject_lines_'+str(run_name)+'.pdf')
 
+		if write_to_table_bool == True:
+			read_data.write_to_table_injecting_lines(data_table_blue, data_table_red, column_names, z_ccfs_full_run, line_wavs_full_run, line_fluxes_full_run, '../Output_ccf/Catalogs/catalog_'+str(run_name)+'_z'+str(redshift_inject))
+
 		return line_detected_fraction_matrix, spurious_lines_matrix, correct_redshift_matrix
 
-	# ---------------------------------- Fixed luminosity -----------------------------------
+	# ---------------------------------- Fixed luminosity and standard deviation -----------------------------------
 	elif type(lum_inject) == float and type(std_inject) == float: 
 
 		line_detected_fraction = []
@@ -136,6 +152,7 @@ def inject_gaussian_lines(linewav_rest_inject, line_type, redshift_inject, lum_i
 			if print_bool == True:
 				print('Running z =', redshift)
 
+			redshift = np.round(redshift,2)
 			redshifts = np.full(len(data_blue), redshift)
 			data_blue_inject, data_red_inject, line_temp_blue, line_temp_red = spec.line_inject(lum_inject, std_inject, data_blue, data_red, redshift, linewav_rest_inject, line_type, True, np.mean(redshift_inject)) # False, False)
 			redshifts_template_fitting, emission_line_wavelengths, emission_line_fluxes, emission_line_snrs = temp.template_fitting(data_blue_inject, data_red_inject, data_table_blue, data_table_red, np.array([num + '_z'+ str(redshift) for num in target_names]), run_name+'_z'+str(redshift),  mask_blue, mask_red, redshifts, save_plot_bool, False, print_bool, diagnostic_bool, show_result_bool, False, True)
@@ -146,7 +163,13 @@ def inject_gaussian_lines(linewav_rest_inject, line_type, redshift_inject, lum_i
 			line_detected_fraction.append(np.sum(line_detected_bool_array)/num_spec)
 			spurious_lines.append(np.sum(spurious_lines_array)/num_spec)
 			correct_redshift_fraction.append(np.sum(redshift_bool_array)/num_spec)
-		
+			
+			z_ccfs_full_run.append(redshifts_template_fitting)
+			line_wavs_full_run.append(emission_line_wavelengths)
+			line_fluxes_full_run.append(emission_line_fluxes)
+
+			column_names.append('z'+str(redshift))
+
 		# np.save('../Output_ccf/Files/inject_lines_detected_fraction_'+run_name+'.npy', line_detected_fraction)
 		# np.save('../Output_ccf/Files/spurious_lines_'+run_name+'.npy', spurious_lines)
 
@@ -156,8 +179,11 @@ def inject_gaussian_lines(linewav_rest_inject, line_type, redshift_inject, lum_i
 		if save_plot_bool == True:
 			print('line_detected_fraction', line_detected_fraction)
 			print('correct_redshift_fraction', correct_redshift_fraction)
-			plot.plot_fraction_detected_vs_redshift(np.log10(lum_inject), redshift_inject, line_detected_fraction, spurious_lines, '$z_{inject}$', 'Fraction detected', chipgap_blue, chipgap_red, '../Output_ccf/Figures/ccf_performance/inject_lines_detected_curves_'+str(run_name)+'.pdf')
-			plot.plot_fraction_detected_vs_redshift(np.log10(lum_inject), redshift_inject, correct_redshift_fraction, spurious_lines, '$z_{inject}$', 'Fraction detected', chipgap_blue, chipgap_red, '../Output_ccf/Figures/ccf_performance/inject_redshift_detected_curves_'+str(run_name)+'.pdf')
+			plot.plot_fraction_detected_vs_redshift(np.log10(lum_inject), redshift_inject, line_detected_fraction, spurious_lines, '$z_{inject}$', 'Fraction detected', chipgap_blue, chipgap_red, mask_blue, mask_red, '../Output_ccf/Figures/ccf_performance/inject_lines_detected_curves_'+str(run_name)+'.pdf')
+			plot.plot_fraction_detected_vs_redshift(np.log10(lum_inject), redshift_inject, correct_redshift_fraction, spurious_lines, '$z_{inject}$', 'Fraction detected', chipgap_blue, chipgap_red, mask_blue, mask_red, '../Output_ccf/Figures/ccf_performance/inject_redshift_detected_curves_'+str(run_name)+'.pdf')
+
+		if write_to_table_bool == True:
+			read_data.write_to_table_injecting_lines(data_table_blue, data_table_red, column_names, z_ccfs_full_run, line_wavs_full_run, line_fluxes_full_run, '../Output_ccf/Catalogs/catalog_'+str(run_name)+'_lum'+str(np.round(np.log10(lum_inject),2))+'_std'+str(std_inject))
 
 		return line_detected_fraction, spurious_lines, correct_redshift_fraction
 

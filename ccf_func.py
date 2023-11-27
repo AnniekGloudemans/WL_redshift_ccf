@@ -10,8 +10,9 @@ from specutils.analysis import template_logwl_resample
 from specutils.analysis import correlation
 from specutils import Spectrum1D
 import plotting as plot
+import pdb
 
-initial_redshifts_fitting = np.linspace(0.0,6.8,69)
+initial_redshifts_fitting = np.linspace(0.0,6.8,69)#6.8,69)
 gal_zip = spec.prepare_template(key='AGN')
 
 

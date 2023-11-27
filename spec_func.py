@@ -123,6 +123,9 @@ def shift_template(template_flux, wavs_idx, z, colour, wav_b_min, wav_b_max, wav
 				template = makeGaus(shifted, wavs_idx, everyLine[1], std=100)
 				ySum += template
 
+		if isinstance(ySum, int) == True:
+			ySum = np.full(len(wavs_idx),0) # for edge case if z=6.8
+
 		return ySum
 
 
@@ -166,7 +169,6 @@ def find_lines(z, wav_min, wav_max):
 
 
 
-
 def absorption_spectra_check(spectra_blue, spectra_red):
 	"""
 	Check if any of the spectra are is potentially an absorpion line spectrum 
@@ -187,7 +189,7 @@ def absorption_spectra_check(spectra_blue, spectra_red):
 		blue_min = 2000 
 		blue_max = 8500
 		red_min = 1000
-		red_max = 14000
+		red_max = 9000#14000
 
 		# fit 6th order polynomial and subtract continuum from the data   
 		z_blue = np.polyfit(spectra_blue[i].spectral_axis.value, spectra_blue[i].flux.value, 6)
@@ -195,6 +197,13 @@ def absorption_spectra_check(spectra_blue, spectra_red):
 
 		z_red = np.polyfit(spectra_red[i].spectral_axis.value, spectra_red[i].flux.value, 6)
 		p_red = np.poly1d(z_red)
+
+		# # Diagnostic plot
+		# plt.plot(spectra_blue[i].spectral_axis.value, spectra_blue[i].flux.value)
+		# plt.plot(spectra_red[i].spectral_axis.value, spectra_red[i].flux.value)
+		# plt.plot(spectra_blue[i].spectral_axis.value[blue_min:blue_max], p_blue(spectra_blue[i].spectral_axis.value[blue_min:blue_max]), c='k')
+		# plt.plot(spectra_red[i].spectral_axis.value[red_min:red_max], p_red(spectra_red[i].spectral_axis.value[red_min:red_max]), c='k')
+		# plt.show()
 
 		std_red_abs = np.std(spectra_red[i].flux.value[red_min:red_max]-p_red(spectra_red[i].spectral_axis.value[red_min:red_max]))
 		std_blue_abs = np.std(spectra_blue[i].flux.value[blue_min:blue_max]-p_blue(spectra_blue[i].spectral_axis.value[blue_min:blue_max]))
@@ -211,7 +220,9 @@ def absorption_spectra_check(spectra_blue, spectra_red):
 		clustering_blue = np.std(spectra_blue[i].spectral_axis.value[idx_blue_down])
 		clustering_red = np.std(spectra_red[i].spectral_axis.value[idx_red_down])
 
-		if red_down_count-red_up_count > 100 or blue_down_count-blue_up_count > 100 or (red_down_count-red_up_count)+(blue_down_count-blue_up_count) > 70 or (blue_down_count-blue_up_count > 25 and clustering_blue < 300) or (red_down_count-red_up_count > 25 and clustering_red < 300):
+		#print(red_down_count-red_up_count, blue_down_count-blue_up_count, (red_down_count-red_up_count)+(blue_down_count-blue_up_count), clustering_blue, clustering_red)
+		
+		if (red_down_count-red_up_count > 100 and clustering_red < 600) or (blue_down_count-blue_up_count > 100 and clustering_blue < 600) or (red_down_count-red_up_count)+(blue_down_count-blue_up_count) > 120 or (blue_down_count-blue_up_count > 25 and clustering_blue < 300) or (red_down_count-red_up_count > 25 and clustering_red < 300):
             
 			if np.median(spectra_red[i].flux.value) > 0.1e-16 or np.median(spectra_blue[i].flux.value) > 0.1e-16: # check if this works on real data
 				bool_array.append(True)
@@ -305,13 +316,6 @@ def find_chipgaps(spectrum, masks, colour):
 	gap_bool = (spectrum.flux.value == 0.0) * (spectrum.spectral_axis.value > min(spectrum.spectral_axis.value)+100.) * (spectrum.spectral_axis.value < max(spectrum.spectral_axis.value)-100.) * mask_bool_array
 	wav_gap = spectrum.spectral_axis.value[gap_bool]
 
-	# if colour == 'b':
-	# 	gap_bool = (spectrum.flux.value == 0.0) * (global_params.wavelength_b > 4000.) * (global_params.wavelength_b < 6000.) * mask_bool_array
-	# 	wav_gap = global_params.wavelength_b[gap_bool]
-	# elif colour == 'r':
-	# 	gap_bool = (spectrum.flux.value == 0.0) * (global_params.wavelength_r > 6000.) * (global_params.wavelength_r < 9500.) * mask_bool_array
-	# 	wav_gap = global_params.wavelength_r[gap_bool]
-	
 	gap = np.array([min(wav_gap), max(wav_gap)])
 
 	return gap

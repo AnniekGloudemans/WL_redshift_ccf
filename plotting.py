@@ -78,12 +78,12 @@ def plot_spectrum_blue_red_lines(spec_blue, spec_red, target_name, line_waveleng
 		if line_wavelengths[i] < min(spec_red.spectral_axis.value):
 			idx_plot_line = np.where((spec_blue.spectral_axis.value > line_wavelengths[i]-100) & (spec_blue.spectral_axis.value < line_wavelengths[i]+100))
 			ax.plot(spec_blue.spectral_axis.value[idx_plot_line], spec_blue.flux.value[idx_plot_line], c=c_blue_spec, alpha=0.7)
-			ax.set_ylim(np.min(spec_blue.flux.value[idx_plot_line])-1e-17, np.max(spec_blue.flux.value[idx_plot_line])+1e-17)
+			ax.set_ylim(np.min(spec_blue.flux.value[idx_plot_line])-0.5e-17, np.max(spec_blue.flux.value[idx_plot_line])+0.5e-17)
 
 		elif line_wavelengths[i] >= min(spec_red.spectral_axis.value):
 			idx_plot_line = np.where((spec_red.spectral_axis.value > line_wavelengths[i]-100) & (spec_red.spectral_axis.value < line_wavelengths[i]+100))
 			ax.plot(spec_red.spectral_axis.value[idx_plot_line], spec_red.flux.value[idx_plot_line], c=c_red_spec, alpha=0.7)
-			ax.set_ylim(np.min(spec_red.flux.value[idx_plot_line])-1e-17, np.max(spec_red.flux.value[idx_plot_line])+1e-17)
+			ax.set_ylim(np.min(spec_red.flux.value[idx_plot_line])-0.5e-17, np.max(spec_red.flux.value[idx_plot_line])+0.5e-17)
 
 		ax.axvline(line_wavelengths[i], color='grey', linestyle='--')
 		ax.tick_params(labelsize=12)
@@ -289,7 +289,7 @@ def plot_2D_hist(x, y, z, xlabel, ylabel, cbar_label, savename):
 	plt.savefig(savename, dpi=100, format='pdf', bbox_inches='tight')
 
 
-def plot_fraction_detected_vs_redshift(variable_list, redshift, fraction_matrix, spurious_matrix, xlabel, ylabel, gap_blue, gap_red, savename):
+def plot_fraction_detected_vs_redshift(variable_list, redshift, fraction_matrix, spurious_matrix, xlabel, ylabel, gap_blue, gap_red, masked_blue, masked_red, savename):
 
 	fig, ax1 = plt.subplots(1,1)
 
@@ -311,6 +311,12 @@ def plot_fraction_detected_vs_redshift(variable_list, redshift, fraction_matrix,
 
 	ax1.fill_between((gap_blue/1216.)-1., -0.1, 1.1, alpha=0.2, color='grey') # chipgaps
 	ax1.fill_between((gap_red/1216.)-1., -0.1, 1.1, alpha=0.2, color='grey') # chipgaps
+
+	for j in range(len(masked_blue)):
+		ax1.fill_between((masked_blue[j]/1216.)-1., -0.1, 1.1, alpha=0.2, color='red')
+
+	for k in range(len(masked_red)):
+		ax1.fill_between((masked_red[k]/1216.)-1., -0.1, 1.1, alpha=0.2, color='red')
 
 	ax1.set_ylim(-0.05,1.05)
 	ax1.legend()

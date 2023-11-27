@@ -15,6 +15,7 @@ from astropy.convolution import convolve, Box1DKernel
 from scipy.optimize import curve_fit
 from itertools import groupby
 from scipy.stats import skew
+import pdb
 
 import emission_lines as line
 import spec_func as spec
@@ -120,12 +121,21 @@ def fit_gaussian(spec, lineloc, linename, fit_line_region, plot_bool = False, sa
     try:
         popt, pcov = curve_fit(gauss, fit_wav, fit_flux, p0=[np.max(fit_flux), lineloc, 5.0, 0.0])
         amp_fit, cen_fit, width_fit, offset_fit = popt
-        
+        width_fit = abs(width_fit) # Make sure the width is a positive value
+
         fwhm_fit = 2.355*width_fit # in Angstrom - only for gaussian line
         fhwm_fit_km_s = 2.355*width_fit*299792.458 / cen_fit 
 
         fitspec_step = (max(fit_wav)-min(fit_wav))/len(fit_wav)
         lineflux = np.sum(fitspec_step * gauss(fit_wav,*popt))-np.sum(offset_fit*(max(fit_wav)-min(fit_wav))) # Take area underneat curve to determine line flux
+
+        # If line is wide, increase the region for determining the scatter around the line
+        if width_fit > 20.0:
+            specmin = min(enumerate(spec.spectral_axis.value), key=lambda x: abs(x[1]-(lineloc-fit_line_region-width_fit)))[0]
+            specmax = min(enumerate(spec.spectral_axis.value), key=lambda x: abs(x[1]-(lineloc+fit_line_region+width_fit)))[0]
+            fit_wav = spec.spectral_axis.value[specmin:specmax]
+            fit_flux = spec.flux.value[specmin:specmax]
+            fit_flux_err = spec.uncertainty.array[specmin:specmax]
 
         # Get region around emission line to determine the scatter
         lowerspecmin = find_nearest(fit_wav, cen_fit-6*abs(width_fit))
@@ -136,6 +146,7 @@ def fit_gaussian(spec, lineloc, linename, fit_line_region, plot_bool = False, sa
         # Determine the noise of background
         if len(np.where(fit_flux[lowerspecmin:lowerspecmax] == 0.0)[0]) > len(fit_flux[lowerspecmin:lowerspecmax])/2.: # get only std of red side
             std_cont = np.std(fit_flux[upperspecmin:upperspecmax])
+
         elif len(np.where(fit_flux[upperspecmin:upperspecmax] == 0.0)[0]) > len(fit_flux[upperspecmin:upperspecmax])/2.: # get only std of blue side
             std_cont = np.std(fit_flux[lowerspecmin:lowerspecmax])
             
@@ -158,8 +169,8 @@ def fit_gaussian(spec, lineloc, linename, fit_line_region, plot_bool = False, sa
         # Calculate chi squared of fit to pick out spurious lines
         # chisq = np.sum((fit_flux[specmin_SNR:specmax_SNR] - gauss(fit_wav,*popt)[specmin_SNR:specmax_SNR]) **2/fit_flux_err[specmin_SNR:specmax_SNR]**2)
 
-        # Check reasonable parameters for gaussian fit
-        if np.logical_or(SNR > 5.0, (SNR>4.0) * (final_run_bool == True) * (linename=='OIII-4959')) and np.isinf(SNR) == False and width_fit < 100. and np.logical_or(width_fit > 1.5, (width_fit > 1.0) * (linename == 'OIII-4959')) and amp_fit > 0.0 and lineflux > 0.0 and np.logical_or(np.logical_or(abs(cen_fit-lineloc)<35.*(width_fit>20.0), abs(cen_fit-lineloc)<45.*(width_fit>50.0)), abs(cen_fit-lineloc)<30.): 
+        # Check reasonable parameters for gaussian fit (SNR threshold used to be 5)
+        if np.logical_or(SNR > 6.0, (SNR>4.0) * (final_run_bool == True) * (linename=='OIII-4959')) and np.isinf(SNR) == False and width_fit < 100. and np.logical_or(width_fit > 1.5, (width_fit > 1.0) * (linename == 'OIII-4959')) and amp_fit > 0.0 and lineflux > 0.0 and np.logical_or(np.logical_or(abs(cen_fit-lineloc)<35.*(width_fit>20.0), abs(cen_fit-lineloc)<45.*(width_fit>50.0)), abs(cen_fit-lineloc)<30.): 
             real_bool = True
         else:
             real_bool = False
@@ -173,12 +184,22 @@ def fit_gaussian(spec, lineloc, linename, fit_line_region, plot_bool = False, sa
                 spurious_bool = True
             elif np.logical_or(abs(cen_fit-5510) < 60, abs(cen_fit-7630) < 90): # Not in one of the gaps --> Don't harcode these!
                 spurious_bool = True
-            elif abs(cen_fit-lineloc) > 15.0 and SNR < 10.0 and linename != 'OIII-4959': # Do not allow any low SNR lines with a large wavelength offset
+            elif abs(cen_fit-lineloc) > 15.0 and SNR < 8.0 and linename != 'OIII-4959': # Do not allow any low SNR lines with a large wavelength offset
                 spurious_bool = True
-            elif width_fit > 20.0 and SNR < 7.0: # Do not allow any low SNR lines with large widths
+            elif abs(cen_fit-lineloc) > 20.0 and SNR < 10.0 and linename != 'OIII-4959': # Do not allow any low SNR lines with a large wavelength offset
+                spurious_bool = True   
+            elif width_fit > 19.0 and SNR < 7.0: # Do not allow any low SNR lines with large widths
+                spurious_bool = True
+            elif width_fit > 29.0 and SNR < 15.0 and abs(cen_fit-lineloc) > 25.0: # Do not allow any low SNR lines with large widths and offset
+                spurious_bool = True
+            elif abs(width_fit - np.sqrt(pcov[2,2])) < 1 and SNR < 10.: # Do not allow line with a possible width smaller than 1 and low SNR 
                 spurious_bool = True
             elif width_fit < 4.0 and SNR < 6.0 and final_run_bool == False: # Do not allow any low SNR lines with small widths if not final line search
                 spurious_bool = True
+            elif width_fit < 2.0 and abs(cen_fit-lineloc) > 10. and SNR < 15.: # Do not allow very narrow lines offset from expected location
+                spurious_bool = True
+            elif abs(cen_fit-6000) < 100. and SNR < 10.0 and final_run_bool == False: # Remove weak lines close to noise of red arm
+                spurious_bool = True 
             # elif SNR < 10. and chisq < 0.01 and final_run_bool == False:# Likely spurious/sky line 
             #     spurious_bool = True
 
@@ -237,10 +258,10 @@ def fit_double_gauss(spec, linewav, plot_bool = False, savename_plot = False, ch
 
     fitspec_step = (max(fit_wav)-min(fit_wav)) / len(fit_wav)
 
-    # Fit single gaussian to get estimate of initial parameters
-    popt_one, pcov_one = curve_fit(gauss,fit_wav,fit_flux, p0=[np.max(fit_flux), linewav, 5.0, 0.0])
-
     try:
+        # Fit single gaussian to get estimate of initial parameters
+        popt_one, pcov_one = curve_fit(gauss,fit_wav,fit_flux, p0=[np.max(fit_flux), linewav, 5.0, 0.0])
+
         popt, pcov = curve_fit(bimodal,fit_wav,fit_flux,p0=[popt_one[1]-(popt_one[2]/2), popt_one[2]/2, np.max(fit_flux), popt_one[1]+(popt_one[2]/1.5), popt_one[2]/2, np.max(fit_flux), 0.0])
 
         lineflux = np.sum(fitspec_step * bimodal(fit_wav,*popt))-np.sum(popt[6]*(max(fit_wav)-min(fit_wav)))
@@ -307,13 +328,13 @@ def single_emission_line(spec_blue, spec_red, linewav, plot_bool, savename_plot)
         spectrum_insert = spec_red
 
     # Fit single and double gaussian --> which one better chisqr fit?
-    lineflux_single, SNR_single, cen_fit_single, real_bool_single, spurious_bool_single, reduced_chisq_single, skew_val, EW_value = fit_gaussian(spectrum_insert, linewav, 'single_line', 100, plot_bool, savename_plot+'single_line_'+str(np.int(linewav))+'.pdf', True, True) 
+    lineflux_single, SNR_single, cen_fit_single, real_bool_single, spurious_bool_single, reduced_chisq_single, skew_val, EW_value = fit_gaussian(spectrum_insert, linewav, 'single_line', 100, plot_bool, savename_plot+'single_line_'+str(int(linewav))+'.pdf', True, True) 
 
     # Rest-frame EW0 = EW/(1 + z)
     EW_0 = EW_value
 
     # Try fitting double gaussian --> also for skewed Lya double is usually a better fit
-    linewav_double, lineflux_double, SNR_double, sep_peaks_double, reduced_chisq_double = fit_double_gauss(spectrum_insert, linewav, plot_bool, savename_plot+'double_line_'+str(np.int(linewav))+'.pdf', True)
+    linewav_double, lineflux_double, SNR_double, sep_peaks_double, reduced_chisq_double = fit_double_gauss(spectrum_insert, linewav, plot_bool, savename_plot+'double_line_'+str(int(linewav))+'.pdf', True)
     expected_z_OII = (linewav/3727.4235) - 1.
     expected_sep_OII = 2.783*(1+expected_z_OII)
 
@@ -376,13 +397,14 @@ def finding_emission_lines(spec_blue, spec_red, redshift_list, final_run_bool = 
                     fit_line_region = 30.0
                 elif line_names_blue[t] == 'NeIII-3868' and final_run_bool == True:
                     fit_line_region = 50.0
+                elif line_names_blue[t] == 'CIV-1549': # Keep this?
+                    fit_line_region = 150.0
                 else:
                     fit_line_region = 100.
-                # if line_names_blue[t] == 'CIV-1549':
-                #     fit_line_region = 150.0
+
 
                 # Fit gaussian and check if line is real
-                lineflux, SNR, cen_fit, real_bool, spurious_bool, red_chisqr, skew_value, EW_value = fit_gaussian(spec_blue, linewav, line_names_blue[t], fit_line_region, plot_bool, savename_plot+line_names_blue[t]+'_'+str(np.int(linewav))+'.pdf', final_run_bool, False)               
+                lineflux, SNR, cen_fit, real_bool, spurious_bool, red_chisqr, skew_value, EW_value = fit_gaussian(spec_blue, linewav, line_names_blue[t], fit_line_region, plot_bool, savename_plot+line_names_blue[t]+'_'+str(int(linewav))+'.pdf', final_run_bool, False)               
 
                 if real_bool == True and spurious_bool == False and np.logical_or(len(line_wav_list) ==0, abs(cen_fit-closest_value(line_wav_list,cen_fit))>10.0): # Save lines if they seem real and not already in the list
                     line_wav_list.append(cen_fit)
@@ -405,7 +427,7 @@ def finding_emission_lines(spec_blue, spec_red, redshift_list, final_run_bool = 
                     fit_line_region = 100. # was 100.
 
                  # Fit gaussian and check if line is real
-                lineflux, SNR, cen_fit, real_bool, spurious_bool, red_chisqr, skew_value, EW_value = fit_gaussian(spec_red, linewav, line_names_red[t], fit_line_region, plot_bool, savename_plot+line_names_red[t]+'_'+str(np.int(linewav))+'.pdf', final_run_bool, False)               
+                lineflux, SNR, cen_fit, real_bool, spurious_bool, red_chisqr, skew_value, EW_value = fit_gaussian(spec_red, linewav, line_names_red[t], fit_line_region, plot_bool, savename_plot+line_names_red[t]+'_'+str(int(linewav))+'.pdf', final_run_bool, False)               
                 
                 if real_bool == True and spurious_bool == False and np.logical_or(len(line_wav_list) == 0, abs(cen_fit-closest_value(line_wav_list,cen_fit))>10.0): # Save lines if they seem real 
                     line_wav_list.append(cen_fit)

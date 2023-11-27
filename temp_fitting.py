@@ -19,7 +19,7 @@ import ccf_func as ccf
 
 from specutils.analysis import template_logwl_resample 
 from specutils import Spectrum1D
-
+import pdb
 
 
 def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red, target_names, run_name, mask_blue = False, mask_red = False, input_redshift_list = False, save_plot_bool = False, write_to_table_bool = True, print_bool = False, diagnostic_plot_bool = False, show_result_bool = False, fix_redshift = False, inject_bool = False):
@@ -139,7 +139,10 @@ def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red,
 			single_line_bool_all_targets.append(False)#np.nan)
 
 			if save_plot_bool == True:
-				plot.plot_spectrum_blue_red_lines(spectra_blue[i], spectra_red[i], target_names[i], [], np.nan, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(target_names[i])+'_abs.pdf', save_plot_bool, input_redshift_list[i], show_result_bool)
+				try: 
+					plot.plot_spectrum_blue_red_lines(spectra_blue[i], spectra_red[i], target_names[i], [], np.nan, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(target_names[i])+'_abs.pdf', save_plot_bool, input_redshift_list[i], show_result_bool)
+				except:
+					plot.plot_spectrum_blue_red_lines(spectra_blue[i], spectra_red[i], target_names[i], [], np.nan, '../Output_ccf/Figures/spectra_output/spectra_'+run_name+'/spectrum_'+str(target_names[i])+'_abs.pdf', save_plot_bool, False, show_result_bool)
 			continue 
 
 		if print_bool == True:
@@ -297,8 +300,8 @@ def template_fitting(spectra_blue, spectra_red, data_table_blue, data_table_red,
 		print('Number single line targets found = ', np.nansum(single_line_bool_all_targets))
 
 	print('Done!')
-
-	return np.array(ratio_redshifts_all_targets), np.array(line_wavs_all_targets), np.array(line_fluxes_all_targets), np.array(line_snr_all_targets)
+	#pdb.set_trace()
+	return np.array(ratio_redshifts_all_targets), line_wavs_all_targets, line_fluxes_all_targets, line_snr_all_targets
 
 
 
