@@ -1,0 +1,15 @@
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# Ignore Python cache and environment files
+__pycache__/
+*.pyc
+.venv/
+
+# Ignore system files (common on macOS)
+.DS_Store
+
+
+old/
+run_ccf_real_data_testing.ipynb
