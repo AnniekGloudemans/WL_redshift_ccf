@@ -13,3 +13,4 @@ __pycache__/
 
 old/
 run_ccf_real_data_testing.ipynb
+Input/*_test.txt
