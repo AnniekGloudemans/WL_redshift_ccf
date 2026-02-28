@@ -86,7 +86,9 @@ def inject_gaussian_lines(linewav_rest_inject, line_type, redshift_inject, lum_i
 	line_fluxes_full_run = []
 	column_names = []
 
+
 	# ---------------------------------- Fixed redshift -----------------------------------
+	
 	if type(redshift_inject) == float:
 
 		line_detected_fraction_matrix = []
@@ -140,7 +142,9 @@ def inject_gaussian_lines(linewav_rest_inject, line_type, redshift_inject, lum_i
 
 		return line_detected_fraction_matrix, spurious_lines_matrix, correct_redshift_matrix
 
+
 	# ---------------------------------- Fixed luminosity and standard deviation -----------------------------------
+	
 	elif type(lum_inject) == float and type(std_inject) == float: 
 
 		line_detected_fraction = []

@@ -334,12 +334,11 @@ def add_to_spectrum(spectra_array, line_template):
 
 	"""
 
-	uncertainty = StdDevUncertainty(0.001*1e-17*np.ones(len(spectra_array[0].spectral_axis))*u.Unit('erg cm-2 s-1 AA-1')) # change!! 
-
 	spectra_array_injected = []
 
 	for i in range(len(spectra_array)):
 	    flux = spectra_array[i].flux + np.array(line_template) * u.Unit('erg cm-2 s-1 AA-1')
+	    uncertainty = spectra_array[i].uncertainty
 	    spec = Spectrum1D(spectral_axis=spectra_array[i].spectral_axis, flux=flux, uncertainty=uncertainty)#std_spec) SOMETHING WRONG WITH STD_SPEC
 	    spectra_array_injected.append(spec)
 

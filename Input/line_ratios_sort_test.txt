@@ -1,4 +1,4 @@
-# num names ratio wav_num wav_denom line_strength
+# num ratio names wav_num wav_denom line_strength
 1 NeVIII/SIII-9068 0.08495346580508567 770.409 9068.6 0.1
 2 NeVIII/HeI-7816 0.09856647837243364 770.409 7816.136 0.1
 3 NeVIII/ArIII-7751 0.09939401836652019 770.409 7751.06 0.1

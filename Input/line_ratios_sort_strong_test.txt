@@ -1,4 +1,4 @@
-# num names ratio wav_num wav_denom line_strength
+# num ratio names wav_num wav_denom line_strength
 1 Lya/Ha 0.18523594814972041 1215.67 6562.819 10.0
 2 CIV-1549/Ha 0.23602662209638875 1549.0 6562.819 10.0
 3 Lya/OIII-5007 0.2428017015912023 1215.67 5006.843 10.0
